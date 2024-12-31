@@ -3,17 +3,15 @@ extern crate rand;
 
 use std::sync::mpsc;
 
-use ed25519_dalek::Signer;
-use ed25519_dalek::{Keypair, PublicKey, Signature, Verifier};
-use rand_07::rngs::OsRng;
-
-use crate::message;
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+use ed25519_dalek::Signature;
+use rand::rngs::OsRng;
 
 use super::cas_ed25519::Ed25519ByteSignature;
 
 pub fn get_ed25519_key_pair() -> Vec<u8> {
-    let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
+    let mut csprng = OsRng;
+    let keypair = SigningKey::generate(&mut csprng);
     let keypair_vec = keypair.to_bytes().to_vec();
     keypair_vec
 }
@@ -29,12 +27,17 @@ pub fn get_ed25519_key_pair_threadpool() -> Vec<u8> {
 }
 
 pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -> Ed25519ByteSignature {
-    let keypair = Keypair::from_bytes(&key_pair).unwrap();
+    let mut key_pair_bytes: [u8; 32] = [0u8; 32];
+    key_pair_bytes.copy_from_slice(&key_pair);
+    let keypair = SigningKey::from_bytes(&key_pair_bytes);
+
     let signature = keypair.sign(&message_to_sign);
     let signature_bytes = signature.to_bytes().to_vec();
-    let public_keypair_bytes = keypair.public.to_bytes().to_vec();
+    let public_keypair_vec = keypair.verifying_key().as_bytes().to_vec();
+
+
     let result = Ed25519ByteSignature {
-        public_key: public_keypair_bytes,
+        public_key: public_keypair_vec,
         signature: signature_bytes
     };
     result
@@ -52,10 +55,15 @@ pub fn ed25519_sign_with_key_pair_threadpool(key_pair: Vec<u8>, message_to_sign:
 
 
 pub fn ed25519_verify_with_key_pair(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
-    let keypair = Keypair::from_bytes(&key_pair).unwrap();
-    let public_key = keypair.public;
-    let signature = Signature::from_bytes(&signature).unwrap();
-    return public_key.verify(&message, &signature).is_ok();
+    let mut key_pair_array = [0u8; 32];
+    key_pair_array.copy_from_slice(&key_pair);
+    let keypair = SigningKey::from_bytes(&key_pair_array);
+
+    let mut signature_array = [0u8; 64];
+    signature_array.copy_from_slice(&signature);
+    let signature = Signature::from_bytes(&signature_array);
+
+    return keypair.verify(&message, &signature).is_ok();
 }
 
 pub fn ed25519_verify_with_key_pair_threadpool(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
@@ -69,10 +77,17 @@ pub fn ed25519_verify_with_key_pair_threadpool(key_pair: Vec<u8>, signature: Vec
 }
 
 pub fn ed25519_verify_with_public_key(public_key: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
-    let public_key_parsed = PublicKey::from_bytes(&public_key).unwrap();
-    let signature_parsed = Signature::from_bytes(&signature).unwrap();
-    return public_key_parsed
-        .verify(&message, &signature_parsed)
+    let mut public_key_array = [0u8; 32];
+    public_key_array.copy_from_slice(&public_key);
+    let verifying_key = VerifyingKey::from_bytes(&public_key_array).unwrap();
+
+    let mut signature_parsed = [0u8; 64];
+    signature_parsed.copy_from_slice(&signature);
+    let signature_parsed = Signature::from_bytes(&signature_parsed);
+
+
+    return verifying_key
+        .verify_strict(&message, &signature_parsed)
         .is_ok();
 }
 

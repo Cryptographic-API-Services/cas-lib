@@ -22,7 +22,6 @@ rsa = "0.9.6"
 scrypt = "0.11.0"
 sha3 = "0.10.8"
 x25519-dalek = {version = "2.0.0", features = ["static_secrets"]}
-rand_07 = { package = "rand", version = "0.7.0" }
 ascon-aead = "0.4.2"
 rayon = "1.10.0"
 hmac = "0.12.1"
@@ -31,15 +30,10 @@ zstd = "0.13"
 hpke = "0.12.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [profile.dev.package.num-bigint-dig]
 opt-level = 3
 
-[dependencies.ed25519-dalek]
-version = "1"
-
 [build-dependencies]
 napi-build = "1"
-
-[profile.dev]
-opt-level = 2
