@@ -1,4 +1,4 @@
 pub struct Ed25519ByteSignature{
-    pub signature: Vec<u8>,
-    pub public_key: Vec<u8>
+    pub signature: [u8; 64],
+    pub public_key: [u8; 32]
 }
