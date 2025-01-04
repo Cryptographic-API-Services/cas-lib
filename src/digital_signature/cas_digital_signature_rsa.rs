@@ -17,5 +17,7 @@ pub trait RSADigitalSignature {
 
 pub trait ED25519DigitalSignature {
     fn digital_signature_ed25519(data_to_sign: &[u8]) -> SHAED25519DalekDigitalSignatureResult;
+    fn digital_signature_ed25519_threadpool(data_to_sign: &[u8]) -> SHAED25519DalekDigitalSignatureResult;
     fn digital_signature_ed25519_verify(public_key: [u8; 32], data_to_verify: &[u8], signature: [u8; 64]) -> bool;
+    fn digital_signature_ed25519_verify_threadpool(public_key: [u8; 32], data_to_verify: &[u8], signature: [u8; 64]) -> bool;
 }
