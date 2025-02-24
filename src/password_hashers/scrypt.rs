@@ -27,7 +27,7 @@ impl CASPasswordHasher for CASScrypt {
             .is_ok();
     }
 
-    fn hash__password_threadpool(password: String) -> String {
+    fn hash_password_threadpool(password: String) -> String {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let hash = Self::hash_password(password);
