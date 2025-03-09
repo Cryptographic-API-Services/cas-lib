@@ -89,10 +89,6 @@ impl CASRSAEncryption for CASRSA {
             sender.send(verified);
         });
         let verified = receiver.recv().unwrap();
-        if verified == false {
-            return true;
-        } else {
-            return false;
-        }
+        verified
     }
 }
