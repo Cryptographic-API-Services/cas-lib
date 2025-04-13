@@ -10,26 +10,26 @@ use aes_gcm::{
     Aes128Gcm, Aes256Gcm, KeyInit, Nonce,
 };
 
-use super::cas_symmetric_encryption::{AesKeyFromX25519SharedSecret, CASAESEncryption};
+use super::cas_symmetric_encryption::{AesKeyFromX25519SharedSecret, CASAES128Encryption, CASAES256Encryption};
 pub struct CASAES128;
 pub struct CASAES256;
 
-impl CASAESEncryption for CASAES256 {
-    fn generate_key() -> Vec<u8> {
-        return Aes256Gcm::generate_key(&mut OsRng).to_vec();
+impl CASAES256Encryption for CASAES256 {
+    fn generate_key() -> [u8; 32] {
+        return Aes256Gcm::generate_key(&mut OsRng).into();
     }
 
-    fn generate_key_threadpool() -> Vec<u8> {
+    fn generate_key_threadpool() -> [u8; 32] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let thread_result = Aes256Gcm::generate_key(&mut OsRng).to_vec();
+            let thread_result = Self::generate_key();
             sender.send(thread_result);
         });
         let result = receiver.recv().unwrap();
         result
     }
 
-    fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
+    fn encrypt_plaintext(aes_key: [u8; 32], nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes256Gcm::new(&key);
         let nonce = Nonce::from_slice(&nonce);
@@ -50,7 +50,7 @@ impl CASAESEncryption for CASAES256 {
         result
     }
 
-    fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+    fn decrypt_ciphertext(aes_key: [u8; 32], nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes256Gcm::new(&key);
         let nonce = Nonce::from_slice(&nonce);
@@ -58,7 +58,7 @@ impl CASAESEncryption for CASAES256 {
         plaintext
     }
 
-    fn decrypt_ciphertext_threadpool(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+    fn decrypt_ciphertext_threadpool(aes_key: [u8; 32], nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let key = GenericArray::from_slice(&aes_key);
@@ -135,21 +135,22 @@ impl CASAESEncryption for CASAES256 {
     }
 }
 
-impl CASAESEncryption for CASAES128 {
-    fn generate_key() -> Vec<u8> {
-        return Aes128Gcm::generate_key(&mut OsRng).to_vec();
+impl CASAES128Encryption for CASAES128 {
+    fn generate_key() -> [u8; 16] {
+        return Aes128Gcm::generate_key(&mut OsRng).into();
     }
 
-    fn generate_key_threadpool() -> Vec<u8> {
+    fn generate_key_threadpool() -> [u8; 16] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            sender.send(Aes128Gcm::generate_key(&mut OsRng).to_vec());
+            let key = Self::generate_key();
+            sender.send(key);
         });
         let result = receiver.recv().unwrap();
         result
     }
 
-    fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
+    fn encrypt_plaintext(aes_key: [u8; 16], nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes128Gcm::new(&key);
         let nonce = Nonce::from_slice(&nonce);
@@ -157,20 +158,17 @@ impl CASAESEncryption for CASAES128 {
         ciphertext
     }
 
-    fn encrypt_plaintext_threadpool(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
+    fn encrypt_plaintext_threadpool(aes_key: [u8; 16], nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let key = GenericArray::from_slice(&aes_key);
-            let cipher = Aes128Gcm::new(&key);
-            let nonce = Nonce::from_slice(&nonce);
-            let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
+            let ciphertext = Self::encrypt_plaintext(aes_key, nonce, plaintext);
             sender.send(ciphertext);
         });
         let result = receiver.recv().unwrap();
         result
     }
 
-    fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+    fn decrypt_ciphertext(aes_key: [u8; 16], nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes128Gcm::new(&key);
         let nonce = Nonce::from_slice(&nonce);
@@ -178,13 +176,10 @@ impl CASAESEncryption for CASAES128 {
         plaintext
     }
 
-    fn decrypt_ciphertext_threadpool(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+    fn decrypt_ciphertext_threadpool(aes_key: [u8; 16], nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let key = GenericArray::from_slice(&aes_key);
-            let cipher = Aes128Gcm::new(&key);
-            let nonce = Nonce::from_slice(&nonce);
-            let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).unwrap();
+            let plaintext = Self::decrypt_ciphertext(aes_key, nonce, ciphertext);
             sender.send(plaintext);
         });
         let result = receiver.recv().unwrap();
