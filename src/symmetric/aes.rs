@@ -15,10 +15,12 @@ pub struct CASAES128;
 pub struct CASAES256;
 
 impl CASAES256Encryption for CASAES256 {
+    /// Generates an AES 256 32-bit Key
     fn generate_key() -> [u8; 32] {
         return Aes256Gcm::generate_key(&mut OsRng).into();
     }
 
+    /// Generates an AES 256 32-bit Key on the threadpool
     fn generate_key_threadpool() -> [u8; 32] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -29,6 +31,7 @@ impl CASAES256Encryption for CASAES256 {
         result
     }
 
+    /// Encrypts with AES-256-GCM taking an aes_key and aes_nonce
     fn encrypt_plaintext(aes_key: [u8; 32], nonce: [u8; 12], plaintext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes256Gcm::new(&key);
@@ -37,6 +40,7 @@ impl CASAES256Encryption for CASAES256 {
         ciphertext
     }
 
+    /// Encrypts with AES-256-GCM taking an aes_key and aes_nonce on the threadpool
     fn encrypt_plaintext_threadpool(aes_key: [u8; 32], nonce: [u8; 12], plaintext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -47,6 +51,7 @@ impl CASAES256Encryption for CASAES256 {
         result
     }
 
+    /// Decrypts with AES-256-GCM taking an aes_key and aes_nonce
     fn decrypt_ciphertext(aes_key: [u8; 32], nonce: [u8; 12], ciphertext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes256Gcm::new(&key);
@@ -55,6 +60,7 @@ impl CASAES256Encryption for CASAES256 {
         plaintext
     }
 
+    /// Encrypts with AES-256-GCM taking an aes_key and aes_nonce on the threadpool
     fn decrypt_ciphertext_threadpool(aes_key: [u8; 32], nonce: [u8; 12], ciphertext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -65,6 +71,7 @@ impl CASAES256Encryption for CASAES256 {
         result
     }
 
+    /// Creates an AES-256 key 32-byte key from an X25519 Shared Secret
     fn key_from_x25519_shared_secret(shared_secret: [u8; 32]) -> Aes256KeyFromX25519SharedSecret {
         let aes_key = (*Key::<Aes256Gcm>::from_slice(&shared_secret)).into();
         let mut aes_nonce: [u8; 12] = Default::default();
@@ -76,6 +83,7 @@ impl CASAES256Encryption for CASAES256 {
         result
     }
 
+    /// Creates an AES-256 key 32-byte key from an X25519 Shared Secret on the threadpool
     fn key_from_x25519_shared_secret_threadpool(shared_secret: [u8; 32]) -> Aes256KeyFromX25519SharedSecret {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -86,12 +94,14 @@ impl CASAES256Encryption for CASAES256 {
         result
     }
     
+    /// Generates an AES nonce
     fn generate_nonce() -> [u8; 12] {
         let mut bytes = [0u8; 12];
         OsRng.fill_bytes(&mut bytes);
         bytes
     }
 
+    /// Generates an AES nonce on the threadpool
     fn generate_nonce_threadpool() -> [u8; 12] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -104,10 +114,12 @@ impl CASAES256Encryption for CASAES256 {
 }
 
 impl CASAES128Encryption for CASAES128 {
+    /// Generates an AES-128 16-byte key
     fn generate_key() -> [u8; 16] {
         return Aes128Gcm::generate_key(&mut OsRng).into();
     }
 
+    /// Generates an AES-128 16-byte key on the threadpool
     fn generate_key_threadpool() -> [u8; 16] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -118,6 +130,7 @@ impl CASAES128Encryption for CASAES128 {
         result
     }
 
+    /// Encrypts with AES-128-GCM taking an aes_key and aes_nonce
     fn encrypt_plaintext(aes_key: [u8; 16], nonce: [u8; 12], plaintext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes128Gcm::new(&key);
@@ -126,6 +139,7 @@ impl CASAES128Encryption for CASAES128 {
         ciphertext
     }
 
+    /// Encrypts with AES-128-GCM taking an aes_key and aes_nonce on the threadpool
     fn encrypt_plaintext_threadpool(aes_key: [u8; 16], nonce: [u8; 12], plaintext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -136,6 +150,7 @@ impl CASAES128Encryption for CASAES128 {
         result
     }
 
+    /// Decrypts with AES-128-GCM taking an aes_key and aes_nonce
     fn decrypt_ciphertext(aes_key: [u8; 16], nonce: [u8; 12], ciphertext: Vec<u8>) -> Vec<u8> {
         let key = GenericArray::from_slice(&aes_key);
         let cipher = Aes128Gcm::new(&key);
@@ -144,6 +159,7 @@ impl CASAES128Encryption for CASAES128 {
         plaintext
     }
 
+    /// Decrypts with AES-128-GCM taking an aes_key and aes_nonce on the threadpool
     fn decrypt_ciphertext_threadpool(aes_key: [u8; 16], nonce: [u8; 12], ciphertext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -154,6 +170,7 @@ impl CASAES128Encryption for CASAES128 {
         result
     }
 
+    /// Generates an AES-128 16-byte key from an X25519 shared secret
     fn key_from_x25519_shared_secret(shared_secret: [u8; 32]) -> Aes128KeyFromX25519SharedSecret {
         let mut aes_key: [u8; 16] = Default::default();
         aes_key.copy_from_slice(&shared_secret[..16]);
@@ -167,6 +184,7 @@ impl CASAES128Encryption for CASAES128 {
         result
     }
 
+    /// Generates an AES-128 16-byte key from an X25519 shared secret on the threadpool
     fn key_from_x25519_shared_secret_threadpool(shared_secret: [u8; 32]) -> Aes128KeyFromX25519SharedSecret {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -177,12 +195,14 @@ impl CASAES128Encryption for CASAES128 {
         result
     }
     
+    /// Generates an AES nonce
     fn generate_nonce() -> [u8; 12] {
         let mut bytes = [0u8; 12];
         OsRng.fill_bytes(&mut bytes);
         bytes
     }
 
+    /// Generates an AES nonce on the threadpool
     fn generate_nonce_threadpool() -> [u8; 12] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
