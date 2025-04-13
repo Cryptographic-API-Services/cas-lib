@@ -11,7 +11,7 @@ mod password_hashers {
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES128::encrypt_plaintext(key, nonce.clone(), file_bytes.clone());
+        let encrypted = CASAES128::encrypt_plaintext(key, nonce, file_bytes.clone());
         let decrypted = CASAES128::decrypt_ciphertext(key, nonce, encrypted);
         assert_eq!(file_bytes, decrypted);
     }
@@ -24,7 +24,7 @@ mod password_hashers {
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES256::encrypt_plaintext(key, nonce.clone(), file_bytes.clone());
+        let encrypted = CASAES256::encrypt_plaintext(key, nonce, file_bytes.clone());
         let decrypted = CASAES256::decrypt_ciphertext(key, nonce, encrypted);
         assert_eq!(file_bytes, decrypted);
     }

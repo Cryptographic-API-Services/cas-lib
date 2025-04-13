@@ -5,7 +5,7 @@ use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::cas_key_exchange::CASKeyExchange;
 
-pub struct x25519SecretPublicKeyResult {
+pub struct X25519SecretPublicKeyResult {
     pub public_key: Vec<u8>,
     pub secret_key: Vec<u8>,
 }
@@ -13,10 +13,10 @@ pub struct x25519SecretPublicKeyResult {
 pub struct X25519;
 
 impl CASKeyExchange for X25519 {
-    fn generate_secret_and_public_key() -> x25519SecretPublicKeyResult {
+    fn generate_secret_and_public_key() -> X25519SecretPublicKeyResult {
         let secret_key = StaticSecret::random_from_rng(OsRng);
         let public_key = PublicKey::from(&secret_key);
-        let result = x25519SecretPublicKeyResult {
+        let result = X25519SecretPublicKeyResult {
             secret_key: secret_key.as_bytes().to_vec(),
             public_key: public_key.as_bytes().to_vec(),
         };
@@ -34,7 +34,7 @@ impl CASKeyExchange for X25519 {
         return secret_key.diffie_hellman(&public_key).as_bytes().to_vec();
     }
     
-    fn generate_secret_and_public_key_threadpool() -> x25519SecretPublicKeyResult {
+    fn generate_secret_and_public_key_threadpool() -> X25519SecretPublicKeyResult {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <X25519 as CASKeyExchange>::generate_secret_and_public_key();
