@@ -8,7 +8,8 @@ use super::cas_ascon_aead::{CASAsconAead};
 pub struct AsconAead;
 
 impl CASAsconAead for AsconAead {
-    fn encrypt(key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
+    /// Encrypts with AscondAead
+    fn encrypt(key: [u8; 16], nonce: [u8; 16], plaintext: Vec<u8>) -> Vec<u8> {
         let key_generic_array = GenericArray::from_slice(&key);
         let nonce_generic_array = GenericArray::from_slice(&nonce);
         let cipher = Ascon128::new(key_generic_array);
@@ -16,17 +17,19 @@ impl CASAsconAead for AsconAead {
         ciphertext
     }
 
-    fn encrypt_threadpool(key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
+    /// Encrypts with AscondAead on the threadpool
+    fn encrypt_threadpool(key: [u8; 16], nonce: [u8; 16], plaintext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let ciphertext = <AsconAead as CASAsconAead>::encrypt(key, nonce, plaintext);
+            let ciphertext = Self::encrypt(key, nonce, plaintext);
             sender.send(ciphertext);
         });
         let result = receiver.recv().unwrap();
         result
     }
 
-    fn decrypt(key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+    /// Decrypts with AscondAead 
+    fn decrypt(key: [u8; 16], nonce: [u8; 16], ciphertext: Vec<u8>) -> Vec<u8> {
         let key_generic_array = GenericArray::from_slice(&key);
         let nonce_generic_array = GenericArray::from_slice(&nonce);
         let cipher = Ascon128::new(key_generic_array);
@@ -34,35 +37,40 @@ impl CASAsconAead for AsconAead {
         plaintext
     }
 
-    fn decrypt_threadpool(key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+    /// Decrypts with AscondAead on the threadpool
+    fn decrypt_threadpool(key: [u8; 16], nonce: [u8; 16], ciphertext: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let plaintext = <AsconAead as CASAsconAead>::decrypt(key, nonce, ciphertext);
+            let plaintext = Self::decrypt(key, nonce, ciphertext);
             sender.send(plaintext);
         });
         let result = receiver.recv().unwrap();
         result
     }
     
-    fn generate_key() -> Vec<u8> {
-        return Ascon128::generate_key(&mut OsRng).to_vec();
+    /// Generates a 16-byte key for Ascon Aead
+    fn generate_key() -> [u8; 16] {
+        return Ascon128::generate_key(&mut OsRng).into();
     }
 
-    fn generate_key_threadpool() -> Vec<u8> {
+    /// Generates a 16-byte key for Ascon Aead on the threadpool
+    fn generate_key_threadpool() -> [u8; 16] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let key = <AsconAead as CASAsconAead>::generate_key();
+            let key = Self::generate_key();
             sender.send(key);
         });
         let result = receiver.recv().unwrap();
         result
     }
     
-    fn generate_nonce() -> Vec<u8> {
-        return Ascon128::generate_nonce(&mut OsRng).to_vec();
+    /// Generates a Ascon Aead nonce
+    fn generate_nonce() -> [u8; 16] {
+        return Ascon128::generate_nonce(&mut OsRng).into();
     }
 
-    fn generate_nonce_threadpool() -> Vec<u8> {
+    /// Generates a Ascon Aead nonce on the threadpool
+    fn generate_nonce_threadpool() -> [u8; 16] {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let key = <AsconAead as CASAsconAead>::generate_nonce();
