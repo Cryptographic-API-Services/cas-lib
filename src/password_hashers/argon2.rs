@@ -9,7 +9,6 @@ use argon2::{
 };
 use rand::RngCore;
 
-use super::cas_password_hasher::CASPasswordHasher;
 
 pub struct CASArgon;
 

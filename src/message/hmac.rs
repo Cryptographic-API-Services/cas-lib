@@ -18,9 +18,7 @@ impl CASHMAC for HMAC {
     fn sign_threadpool(key: Vec<u8>, message: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let mut mac = HmacSha256::new_from_slice(&key).unwrap();
-            mac.update(&message);
-            let result = mac.finalize().into_bytes().to_vec();
+            let result = Self::sign(key, message);
             sender.send(result);
         });
         let result = receiver.recv().unwrap();
@@ -36,9 +34,7 @@ impl CASHMAC for HMAC {
     fn verify_threadpool(key: Vec<u8>, message: Vec<u8>, signature: Vec<u8>) -> bool {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let mut mac = HmacSha256::new_from_slice(&key).unwrap();
-            mac.update(&message);
-            let result = mac.verify_slice(&signature).is_ok();
+            let result = Self::verify(key, message, signature);
             sender.send(result);
         });
         let result = receiver.recv().unwrap();
