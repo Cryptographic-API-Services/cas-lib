@@ -38,7 +38,7 @@ impl CASHasher for CASBlake2 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <CASBlake2 as CASHasher>::hash_512(data_to_hash);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -48,7 +48,7 @@ impl CASHasher for CASBlake2 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <CASBlake2 as CASHasher>::verify_512(hash_to_verify, data_to_verify);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -58,7 +58,7 @@ impl CASHasher for CASBlake2 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <CASBlake2 as CASHasher>::hash_256(data_to_hash);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -68,7 +68,7 @@ impl CASHasher for CASBlake2 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <CASBlake2 as CASHasher>::verify_256(hash_to_verify, data_to_verify);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

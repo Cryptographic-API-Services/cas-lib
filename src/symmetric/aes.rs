@@ -25,7 +25,7 @@ impl CASAES256Encryption for CASAES256 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let thread_result = Self::generate_key();
-            sender.send(thread_result);
+            sender.send(thread_result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -45,7 +45,7 @@ impl CASAES256Encryption for CASAES256 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let ciphertext = Self::encrypt_plaintext(aes_key, nonce, plaintext);
-            sender.send(ciphertext);
+            sender.send(ciphertext).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -65,7 +65,7 @@ impl CASAES256Encryption for CASAES256 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let plaintext = Self::decrypt_ciphertext(aes_key, nonce, ciphertext);
-            sender.send(plaintext);
+            sender.send(plaintext).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -88,7 +88,7 @@ impl CASAES256Encryption for CASAES256 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = Self::key_from_x25519_shared_secret(shared_secret);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -106,7 +106,7 @@ impl CASAES256Encryption for CASAES256 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let random_bytes = Self::generate_nonce();
-            sender.send(random_bytes);
+            sender.send(random_bytes).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -124,7 +124,7 @@ impl CASAES128Encryption for CASAES128 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let key = Self::generate_key();
-            sender.send(key);
+            sender.send(key).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -144,7 +144,7 @@ impl CASAES128Encryption for CASAES128 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let ciphertext = Self::encrypt_plaintext(aes_key, nonce, plaintext);
-            sender.send(ciphertext);
+            sender.send(ciphertext).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -164,7 +164,7 @@ impl CASAES128Encryption for CASAES128 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let plaintext = Self::decrypt_ciphertext(aes_key, nonce, ciphertext);
-            sender.send(plaintext);
+            sender.send(plaintext).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -189,7 +189,7 @@ impl CASAES128Encryption for CASAES128 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = Self::key_from_x25519_shared_secret(shared_secret);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -207,7 +207,7 @@ impl CASAES128Encryption for CASAES128 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let random_bytes = Self::generate_nonce();
-            sender.send(random_bytes);
+            sender.send(random_bytes).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

@@ -42,7 +42,7 @@ impl ED25519DigitalSignature for SHA256ED25519DigitalSignature {
         let data_clone = data_to_sign.to_vec();
         rayon::spawn(move || {
             let result = <SHA256ED25519DigitalSignature as ED25519DigitalSignature>::digital_signature_ed25519(&data_clone);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -53,7 +53,7 @@ impl ED25519DigitalSignature for SHA256ED25519DigitalSignature {
         let data_to_verify_clone = data_to_verify.to_vec();
         rayon::spawn(move || {
             let result = <SHA256ED25519DigitalSignature as ED25519DigitalSignature>::digital_signature_ed25519_verify(public_key, &data_to_verify_clone, signature);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

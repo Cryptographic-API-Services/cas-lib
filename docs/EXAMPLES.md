@@ -43,12 +43,12 @@ fn main() {
     let aes_key = <CASAES256 as CASAESEncryption>::generate_key();
     let encrypted_bytes = <CASAES256 as CASAESEncryption>::encrypt_plaintext(aes_key.clone(), aes_nonce.clone(), file_bytes);
     let mut file =  File::create("encrypted.docx").unwrap();
-    file.write_all(&encrypted_bytes);
+    file.write_all(&decrypted_bytes).unwrap();
 
     let path = Path::new("encrypted.docx");
     let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
     let decrypted_bytes = <CASAES256 as CASAESEncryption>::decrypt_ciphertext(aes_key, aes_nonce, file_bytes);
     let mut file =  File::create("decrypted.docx").unwrap();
-    file.write_all(&decrypted_bytes);
+    file.write_all(&decrypted_bytes).unwrap();
 }
 ```

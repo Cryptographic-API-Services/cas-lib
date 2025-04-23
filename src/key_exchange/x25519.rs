@@ -38,7 +38,7 @@ impl CASKeyExchange for X25519 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <X25519 as CASKeyExchange>::generate_secret_and_public_key();
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -48,7 +48,7 @@ impl CASKeyExchange for X25519 {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <X25519 as CASKeyExchange>::diffie_hellman(my_secret_key, users_public_key);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

@@ -22,7 +22,7 @@ impl CASAsconAead for AsconAead {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let ciphertext = Self::encrypt(key, nonce, plaintext);
-            sender.send(ciphertext);
+            sender.send(ciphertext).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -42,7 +42,7 @@ impl CASAsconAead for AsconAead {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let plaintext = Self::decrypt(key, nonce, ciphertext);
-            sender.send(plaintext);
+            sender.send(plaintext).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -58,7 +58,7 @@ impl CASAsconAead for AsconAead {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let key = Self::generate_key();
-            sender.send(key);
+            sender.send(key).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -74,7 +74,7 @@ impl CASAsconAead for AsconAead {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let key = <AsconAead as CASAsconAead>::generate_nonce();
-            sender.send(key);
+            sender.send(key).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

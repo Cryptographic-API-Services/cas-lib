@@ -25,7 +25,6 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let hash = <CASSHA as CASHasher>::hash_256(file_bytes);
 
-        let path_2 = Path::new("tests/test.docx");
         let file_bytes_2: Vec<u8> = std::fs::read(path).unwrap();
         let hash_2 = <CASSHA as CASHasher>::hash_256(file_bytes_2);
 
@@ -51,7 +50,6 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let hash = <CASSHA as CASHasher>::hash_512(file_bytes);
 
-        let path_2 = Path::new("tests/test.docx");
         let file_bytes_2: Vec<u8> = std::fs::read(path).unwrap();
         let hash_2 = <CASSHA as CASHasher>::hash_512(file_bytes_2);
 
@@ -77,7 +75,6 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let hash = <CASSHA as CASHasher>::hash_256_threadpool(file_bytes);
 
-        let path_2 = Path::new("tests/test.docx");
         let file_bytes_2: Vec<u8> = std::fs::read(path).unwrap();
         let hash_2 = <CASSHA as CASHasher>::hash_256_threadpool(file_bytes_2);
 
@@ -103,7 +100,6 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let hash = <CASSHA as CASHasher>::hash_512_threadpool(file_bytes);
 
-        let path_2 = Path::new("tests/test.docx");
         let file_bytes_2: Vec<u8> = std::fs::read(path).unwrap();
         let hash_2 = <CASSHA as CASHasher>::hash_512_threadpool(file_bytes_2);
 
