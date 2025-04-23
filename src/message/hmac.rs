@@ -19,7 +19,7 @@ impl CASHMAC for HMAC {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = Self::sign(key, message);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -35,7 +35,7 @@ impl CASHMAC for HMAC {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = Self::verify(key, message, signature);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

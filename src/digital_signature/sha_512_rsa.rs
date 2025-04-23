@@ -45,7 +45,7 @@ impl RSADigitalSignature for SHA512RSADigitalSignature {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <SHA512RSADigitalSignature as RSADigitalSignature>::digital_signature_rsa(rsa_key_size, data_to_sign);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result
@@ -72,7 +72,7 @@ impl RSADigitalSignature for SHA512RSADigitalSignature {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <SHA512RSADigitalSignature as RSADigitalSignature>::verify_rsa(public_key, data_to_verify, signature);
-            sender.send(result);
+            sender.send(result).unwrap();
         });
         let result = receiver.recv().unwrap();
         result

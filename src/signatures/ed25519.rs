@@ -20,7 +20,7 @@ pub fn get_ed25519_key_pair_threadpool() -> [u8; 32] {
     let (sender, receiver) = mpsc::channel();
     rayon::spawn(move || {
         let result = get_ed25519_key_pair();
-        sender.send(result);
+        sender.send(result).unwrap();
     });
     let result = receiver.recv().unwrap();
     result
@@ -43,7 +43,7 @@ pub fn ed25519_sign_with_key_pair_threadpool(key_pair: [u8; 32], message_to_sign
     let message_to_sign_clone = message_to_sign.to_vec(); 
     rayon::spawn(move || {
         let result = ed25519_sign_with_key_pair(key_pair, &message_to_sign_clone);
-        sender.send(result);
+        sender.send(result).unwrap();
     });
     let result = receiver.recv().unwrap();
     result
@@ -61,7 +61,7 @@ pub fn ed25519_verify_with_key_pair_threadpool(key_pair: [u8; 32], signature: [u
     let message_clone = message.to_vec();
     rayon::spawn(move || {
         let result = ed25519_verify_with_key_pair(key_pair, signature, &message_clone);
-        sender.send(result);
+        sender.send(result).unwrap();
     });
     let result = receiver.recv().unwrap();
     result
@@ -80,7 +80,7 @@ pub fn ed25519_verify_with_public_key_threadpool(public_key: [u8; 32], signature
     let message_clone = message.to_vec();
     rayon::spawn(move || {
         let result = ed25519_verify_with_public_key(public_key, signature, &message_clone);
-        sender.send(result);
+        sender.send(result).unwrap();
     });
     let result = receiver.recv().unwrap();
     result

@@ -48,7 +48,7 @@ impl CASRSAEncryption for CASRSA {
                     .unwrap()
                     .to_string(),
             };
-            sender.send(thread_result);
+            sender.send(thread_result).unwrap();
         });
         let thread_result: RSAKeyPairResult = receiver.recv().unwrap();
         thread_result
@@ -66,7 +66,7 @@ impl CASRSAEncryption for CASRSA {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let signed_data = Self::sign(private_key, hash);
-            sender.send(signed_data);
+            sender.send(signed_data).unwrap();
         });
         let signed_data = receiver.recv().unwrap();
         signed_data
@@ -86,7 +86,7 @@ impl CASRSAEncryption for CASRSA {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let verified = Self::verify(public_key, hash, signed_text);
-            sender.send(verified);
+            sender.send(verified).unwrap();
         });
         let verified = receiver.recv().unwrap();
         verified

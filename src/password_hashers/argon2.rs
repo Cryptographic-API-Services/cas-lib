@@ -55,7 +55,7 @@ impl CASArgon {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let hash = Self::hash_password(password);
-            sender.send(hash);
+            sender.send(hash).unwrap();
         });
         let hash = receiver.recv().unwrap();
         hash
@@ -65,7 +65,7 @@ impl CASArgon {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let hash = Self::verify_password(hashed_password, password_to_verify);
-            sender.send(hash);
+            sender.send(hash).unwrap();
         });
         let hash = receiver.recv().unwrap();
         hash
