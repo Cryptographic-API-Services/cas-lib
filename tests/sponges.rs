@@ -11,11 +11,11 @@ mod tests {
         let ascon_key = <AsconAead as CASAsconAead>::generate_key();
         let encrypted_bytes = <AsconAead as CASAsconAead>::encrypt(ascon_key, ascon_nonce, file_bytes.clone());
         let mut file =  File::create("encrypted.docx").unwrap();
-        file.write_all(&encrypted_bytes);
+        file.write_all(&encrypted_bytes).unwrap();
 
         let decrypted_bytes = <AsconAead as CASAsconAead>::decrypt(ascon_key, ascon_nonce, encrypted_bytes);
         let mut file =  File::create("decrypted.docx").unwrap();
-        file.write_all(&decrypted_bytes);
+        file.write_all(&decrypted_bytes).unwrap();
         assert_eq!(file_bytes, decrypted_bytes);
     }
 
@@ -27,11 +27,11 @@ mod tests {
         let ascon_key = <AsconAead as CASAsconAead>::generate_key_threadpool();
         let encrypted_bytes = <AsconAead as CASAsconAead>::encrypt_threadpool(ascon_key, ascon_nonce, file_bytes.clone());
         let mut file =  File::create("encrypted.docx").unwrap();
-        file.write_all(&encrypted_bytes);
+        file.write_all(&encrypted_bytes).unwrap();
 
         let decrypted_bytes = <AsconAead as CASAsconAead>::decrypt_threadpool(ascon_key, ascon_nonce, encrypted_bytes);
         let mut file =  File::create("decrypted.docx").unwrap();
-        file.write_all(&decrypted_bytes);
+        file.write_all(&decrypted_bytes).unwrap();
         assert_eq!(file_bytes, decrypted_bytes);
     }
 }

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod digital_signatures {
-    use cas_lib::digital_signature::{cas_digital_signature_rsa::{ED25519DigitalSignature, SHAED25519DalekDigitalSignatureResult}, sha_256_ed25519::SHA256ED25519DigitalSignature, sha_256_rsa::SHA256RSADigitalSignature, sha_512_ed25519::SHA512ED25519DigitalSignature};
+    use cas_lib::digital_signature::{cas_digital_signature_rsa::{ED25519DigitalSignature, SHAED25519DalekDigitalSignatureResult}, sha_256_ed25519::SHA256ED25519DigitalSignature, sha_512_ed25519::SHA512ED25519DigitalSignature};
  
     #[test]
     pub fn ed25519_sha_512_digital_signature_verify() {
