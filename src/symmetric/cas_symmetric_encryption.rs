@@ -19,6 +19,8 @@ pub trait CASAES256Encryption {
     fn key_from_x25519_shared_secret_threadpool(shared_secret: [u8; 32]) -> Aes256KeyFromX25519SharedSecret;
     fn generate_nonce() -> [u8; 12];
     fn generate_nonce_threadpool() -> [u8; 12];
+    fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8>;
+    fn key_from_vec_threadpool(key_slice: Vec<u8>) -> Vec<u8>;
 }
 
 pub trait CASAES128Encryption {
@@ -32,4 +34,6 @@ pub trait CASAES128Encryption {
     fn key_from_x25519_shared_secret_threadpool(shared_secret: [u8; 32]) -> Aes128KeyFromX25519SharedSecret;
     fn generate_nonce() -> [u8; 12];
     fn generate_nonce_threadpool() -> [u8; 12];
+    fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8>;
+    fn key_from_vec_threadpool(key_slice: Vec<u8>) -> Vec<u8>;
 }

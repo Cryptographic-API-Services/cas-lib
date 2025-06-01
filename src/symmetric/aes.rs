@@ -15,6 +15,24 @@ pub struct CASAES128;
 pub struct CASAES256;
 
 impl CASAES256Encryption for CASAES256 {
+
+    // Generates an AES256 key from a vector
+    fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8> {
+        let result = Key::<Aes256Gcm>::from_slice(&key_slice).to_vec();
+        result
+    }
+
+    // Generates an AES256 key from a vector on the threadpool
+    fn key_from_vec_threadpool(key_slice: Vec<u8>) -> Vec<u8> {
+        let (sender, receiver) = mpsc::channel();
+        rayon::spawn(move || {
+            let result = Key::<Aes256Gcm>::from_slice(&key_slice).to_vec();
+            sender.send(result).unwrap();
+        });
+        let result = receiver.recv().unwrap();
+        result
+    }
+
     /// Generates an AES 256 32-bit Key
     fn generate_key() -> [u8; 32] {
         return Aes256Gcm::generate_key(&mut OsRng).into();
@@ -114,6 +132,24 @@ impl CASAES256Encryption for CASAES256 {
 }
 
 impl CASAES128Encryption for CASAES128 {
+
+    // Generates an AES128 key from a vector
+    fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8> {
+        let result = Key::<Aes128Gcm>::from_slice(&key_slice).to_vec();
+        result
+    }
+
+    // Generates an AES128 key from a vector on the threadpool
+    fn key_from_vec_threadpool(key_slice: Vec<u8>) -> Vec<u8> {
+        let (sender, receiver) = mpsc::channel();
+        rayon::spawn(move || {
+            let result = Key::<Aes128Gcm>::from_slice(&key_slice).to_vec();
+            sender.send(result).unwrap();
+        });
+        let result = receiver.recv().unwrap();
+        result
+    }
+
     /// Generates an AES-128 16-byte key
     fn generate_key() -> [u8; 16] {
         return Aes128Gcm::generate_key(&mut OsRng).into();
