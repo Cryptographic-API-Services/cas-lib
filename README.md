@@ -4,7 +4,7 @@
 
 ## Overview
 This is our experimental core library which takes advantage of Rust's thread safe nature to provide an abstraction layer to higher level languages to run industry standard crytographic operations sequentially and in parallel.
-This crate is not us writing crpytography algorthims directly in Rust, rather is it a wrapper layer for the following organizations who have done lots of hard work for us. The main usage of this library is providing a centralized entry point for various langague FFI layers throughout CAS [C FFI](https://github.com/Cryptographic-API-Services/cas-core-lib), [Typescript](https://github.com/Cryptographic-API-Services/cas-typescript-sdk), [Python](https://github.com/Cryptographic-API-Services/cas-python-sdk).
+This crate is not us writing cryptography operations directly in Rust, rather is it a wrapper layer for the following organizations who have done lots of hard work for us. The main usage of this library is providing a centralized entry point for various langague FFI layers throughout CAS [C FFI](https://github.com/Cryptographic-API-Services/cas-core-lib), [Typescript](https://github.com/Cryptographic-API-Services/cas-typescript-sdk), [Python](https://github.com/Cryptographic-API-Services/cas-python-sdk).
 
 Most functions within this library have a corresponding option to run the algorithm on a Rayon threadpool. Typically the functions end with `_threadpool`.
 
