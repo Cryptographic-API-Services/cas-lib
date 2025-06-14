@@ -1,6 +1,6 @@
 [package]
 name = "cas-lib"
-version = "0.2.48"
+version = "0.2.49"
 edition = "2021"
 description = "Core lib for CAS"
 license = "Apache-2.0"
@@ -31,6 +31,7 @@ hpke = "0.12.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
+hkdf = "0.12.4"
 
 [profile.dev.package.num-bigint-dig]
 opt-level = 3

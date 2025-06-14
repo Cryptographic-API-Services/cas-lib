@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use aes_gcm::Key;
 
+use hkdf::Hkdf;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
@@ -9,6 +10,7 @@ use aes_gcm::{
     aead::{generic_array::GenericArray, Aead},
     Aes128Gcm, Aes256Gcm, KeyInit, Nonce,
 };
+use sha2::Sha256;
 
 use super::cas_symmetric_encryption::{Aes128KeyFromX25519SharedSecret, Aes256KeyFromX25519SharedSecret, CASAES128Encryption, CASAES256Encryption};
 pub struct CASAES128;
@@ -91,9 +93,11 @@ impl CASAES256Encryption for CASAES256 {
 
     /// Creates an AES-256 key 32-byte key from an X25519 Shared Secret
     fn key_from_x25519_shared_secret(shared_secret: [u8; 32]) -> Aes256KeyFromX25519SharedSecret {
-        let aes_key = (*Key::<Aes256Gcm>::from_slice(&shared_secret)).into();
-        let mut aes_nonce: [u8; 12] = Default::default();
-        aes_nonce.copy_from_slice(&shared_secret[..12]);
+        let hk = Hkdf::<Sha256>::new(None, &shared_secret);
+        let mut aes_key    = [0u8; 32];
+        let mut aes_nonce = [0u8; 12];
+        hk.expand(b"aes key", &mut aes_key).unwrap();
+        hk.expand(b"nonce",   &mut aes_nonce).unwrap();
         let result = Aes256KeyFromX25519SharedSecret {
             aes_key: aes_key,
             aes_nonce: aes_nonce,
@@ -208,13 +212,13 @@ impl CASAES128Encryption for CASAES128 {
 
     /// Generates an AES-128 16-byte key from an X25519 shared secret
     fn key_from_x25519_shared_secret(shared_secret: [u8; 32]) -> Aes128KeyFromX25519SharedSecret {
-        let mut aes_key: [u8; 16] = Default::default();
-        aes_key.copy_from_slice(&shared_secret[..16]);
-        let aes_key_slice: [u8; 16] = (*Key::<Aes128Gcm>::from_slice(&aes_key)).into();
-        let mut aes_nonce: [u8; 12] = Default::default();
-        aes_nonce.copy_from_slice(&shared_secret[..12]);
+        let hk = Hkdf::<Sha256>::new(None, &shared_secret);
+        let mut aes_key    = [0u8; 16];
+        let mut aes_nonce = [0u8; 12];
+        hk.expand(b"aes key", &mut aes_key).unwrap();
+        hk.expand(b"nonce",   &mut aes_nonce).unwrap();
         let result = Aes128KeyFromX25519SharedSecret {
-            aes_key: aes_key_slice,
+            aes_key: aes_key,
             aes_nonce: aes_nonce,
         };
         result
