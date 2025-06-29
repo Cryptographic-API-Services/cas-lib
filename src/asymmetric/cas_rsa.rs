@@ -34,20 +34,7 @@ impl CASRSAEncryption for CASRSA {
     fn generate_rsa_keys_threadpool(key_size: usize) -> RSAKeyPairResult {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let mut rng: OsRng = OsRng;
-            let private_key: RsaPrivateKey =
-                RsaPrivateKey::new(&mut rng, key_size).expect("failed to generate a key");
-            let public_key: RsaPublicKey = private_key.to_public_key();
-            let thread_result = RSAKeyPairResult {
-                private_key: private_key
-                    .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
-                    .unwrap()
-                    .to_string(),
-                public_key: public_key
-                    .to_pkcs1_pem(rsa::pkcs8::LineEnding::LF)
-                    .unwrap()
-                    .to_string(),
-            };
+            let thread_result = Self::generate_rsa_keys(key_size);
             sender.send(thread_result).unwrap();
         });
         let thread_result: RSAKeyPairResult = receiver.recv().unwrap();
