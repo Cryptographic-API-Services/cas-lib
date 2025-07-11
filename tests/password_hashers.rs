@@ -5,52 +5,52 @@ mod password_hashers {
     
     #[test]
     pub fn argon2_derive_aes_128_and_encrypt() {
-        let password = b"BadPassword"; // do not use this as a password.
+        let password = b"BadPassword".to_vec(); // do not use this as a password.
         let key = CASArgon::derive_aes_128_key(password);
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES128::encrypt_plaintext(key, nonce, file_bytes.clone());
+        let encrypted = CASAES128::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone());
         let decrypted = CASAES128::decrypt_ciphertext(key, nonce, encrypted);
         assert_eq!(file_bytes, decrypted);
     }
 
     #[test]
     pub fn argon2_derive_aes_256_and_encrypt() {
-        let password = b"BadPassword"; // do not use this as a password.
+        let password = b"BadPassword".to_vec(); // do not use this as a password.
         let key = CASArgon::derive_aes_256_key(password);
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES256::encrypt_plaintext(key, nonce, file_bytes.clone());
+        let encrypted = CASAES256::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone());
         let decrypted = CASAES256::decrypt_ciphertext(key, nonce, encrypted);
         assert_eq!(file_bytes, decrypted);
     }
 
     #[test]
     pub fn argon2_derive_aes_128_and_encrypt_threadpool() {
-        let password = b"BadPassword"; // do not use this as a password.
+        let password = b"BadPassword".to_vec(); // do not use this as a password.
         let key = CASArgon::derive_aes_128_key(password);
         let nonce = CASAES128::generate_nonce_threadpool();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES128::encrypt_plaintext_threadpool(key, nonce, file_bytes.clone());
+        let encrypted = CASAES128::encrypt_plaintext_threadpool(key.clone(), nonce.clone(), file_bytes.clone());
         let decrypted = CASAES128::decrypt_ciphertext_threadpool(key, nonce, encrypted);
         assert_eq!(file_bytes, decrypted);
     }
 
     #[test]
     pub fn argon2_derive_aes_256_and_encrypt_threadpool() {
-        let password = b"BadPassword"; // do not use this as a password.
+        let password = b"BadPassword".to_vec(); // do not use this as a password.
         let key = CASArgon::derive_aes_256_key(password);
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES256::encrypt_plaintext(key, nonce, file_bytes.clone());
+        let encrypted = CASAES256::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone());
         let decrypted = CASAES256::decrypt_ciphertext(key, nonce, encrypted);
         assert_eq!(file_bytes, decrypted);
     }

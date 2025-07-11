@@ -13,7 +13,7 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let aes_nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
         let aes_key = <CASAES256 as CASAES256Encryption>::generate_key();
-        let encrypted_bytes = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(aes_key, aes_nonce, file_bytes.clone());
+        let encrypted_bytes = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(aes_key.clone(), aes_nonce.clone(), file_bytes.clone());
         let mut file =  File::create("encrypted.docx").unwrap();
         file.write_all(&encrypted_bytes).unwrap();
 
@@ -51,7 +51,7 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let aes_nonce = <CASAES128 as CASAES128Encryption>::generate_nonce();
         let aes_key = <CASAES128 as CASAES128Encryption>::generate_key();
-        let encrypted_bytes = <CASAES128 as CASAES128Encryption>::encrypt_plaintext(aes_key, aes_nonce, file_bytes.clone());
+        let encrypted_bytes = <CASAES128 as CASAES128Encryption>::encrypt_plaintext(aes_key.clone(), aes_nonce.clone(), file_bytes.clone());
         let mut file =  File::create("encrypted.docx").unwrap();
         file.write_all(&encrypted_bytes).unwrap();
 

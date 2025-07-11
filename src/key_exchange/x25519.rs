@@ -23,15 +23,15 @@ impl CASKeyExchange for X25519 {
         result
     }
 
-    fn diffie_hellman(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> [u8; 32] {
-        let mut secret_key_array: [u8; 32] = Default::default();
-        secret_key_array.copy_from_slice(&my_secret_key);
-        let mut users_public_key_array: [u8; 32] = Default::default();
-        users_public_key_array.copy_from_slice(&users_public_key);
+    fn diffie_hellman(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> Vec<u8> {
+        let mut secret_key_box = Box::new([0u8; 32]);
+        secret_key_box.copy_from_slice(&my_secret_key);
+        let mut users_public_key_box = Box::new([0u8; 32]);
+        users_public_key_box.copy_from_slice(&users_public_key);
 
-        let secret_key = StaticSecret::from(secret_key_array);
-        let public_key = PublicKey::from(users_public_key_array);
-        return secret_key.diffie_hellman(&public_key).to_bytes();
+        let secret_key = StaticSecret::from(*secret_key_box);
+        let public_key = PublicKey::from(*users_public_key_box);
+        return secret_key.diffie_hellman(&public_key).as_bytes().to_vec();
     }
     
     fn generate_secret_and_public_key_threadpool() -> X25519SecretPublicKeyResult {
@@ -44,7 +44,7 @@ impl CASKeyExchange for X25519 {
         result
     }
     
-    fn diffie_hellman_threadpool(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> [u8; 32] {
+    fn diffie_hellman_threadpool(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
             let result = <X25519 as CASKeyExchange>::diffie_hellman(my_secret_key, users_public_key);
