@@ -1,7 +1,3 @@
-use zeroizing_alloc::ZeroAlloc;
-
-#[global_allocator]
-static ALLOC: ZeroAlloc<std::alloc::System> = ZeroAlloc(std::alloc::System);
 pub mod password_hashers {
     pub mod argon2;
     pub mod bcrypt;
