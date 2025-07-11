@@ -9,7 +9,7 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let ascon_nonce = <AsconAead as CASAsconAead>::generate_nonce();
         let ascon_key = <AsconAead as CASAsconAead>::generate_key();
-        let encrypted_bytes = <AsconAead as CASAsconAead>::encrypt(ascon_key, ascon_nonce, file_bytes.clone());
+        let encrypted_bytes = <AsconAead as CASAsconAead>::encrypt(ascon_key.clone(), ascon_nonce.clone(), file_bytes.clone());
         let mut file =  File::create("encrypted.docx").unwrap();
         file.write_all(&encrypted_bytes).unwrap();
 
@@ -25,7 +25,7 @@ mod tests {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let ascon_nonce = <AsconAead as CASAsconAead>::generate_nonce_threadpool();
         let ascon_key = <AsconAead as CASAsconAead>::generate_key_threadpool();
-        let encrypted_bytes = <AsconAead as CASAsconAead>::encrypt_threadpool(ascon_key, ascon_nonce, file_bytes.clone());
+        let encrypted_bytes = <AsconAead as CASAsconAead>::encrypt_threadpool(ascon_key.clone(), ascon_nonce.clone(), file_bytes.clone());
         let mut file =  File::create("encrypted.docx").unwrap();
         file.write_all(&encrypted_bytes).unwrap();
 
