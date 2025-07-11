@@ -17,7 +17,7 @@ mod ed25519 {
     #[test]
     pub fn sign_with_key_pair() {
         let key_pair = get_ed25519_key_pair();
-        let message_to_sign = b"Hello World Message To Sign";
+        let message_to_sign = b"Hello World Message To Sign".to_vec();
         let signature = ed25519_sign_with_key_pair(key_pair, message_to_sign);
         assert!(signature.signature != [0; 64], "Array is all zeros");
         assert!(signature.public_key != [0; 32], "Array is all zeros");
@@ -26,7 +26,7 @@ mod ed25519 {
     #[test]
     pub fn sign_with_key_pair_threadpool() {
         let key_pair = get_ed25519_key_pair_threadpool();
-        let message_to_sign = b"Hello World Message To Sign";
+        let message_to_sign = b"Hello World Message To Sign".to_vec();
         let signature = ed25519_sign_with_key_pair_threadpool(key_pair, message_to_sign);
         assert!(signature.signature != [0; 64], "Array is all zeros");
         assert!(signature.public_key != [0; 32], "Array is all zeros");
@@ -35,8 +35,8 @@ mod ed25519 {
     #[test]
     pub fn verify_with_public_key_() {
         let key_pair = get_ed25519_key_pair();
-        let message_to_sign = b"Hello World Message To Sign";
-        let signature = ed25519_sign_with_key_pair(key_pair, message_to_sign);
+        let message_to_sign = b"Hello World Message To Sign".to_vec();
+        let signature = ed25519_sign_with_key_pair(key_pair, message_to_sign.clone());
         let verification = ed25519_verify_with_public_key(signature.public_key, signature.signature, message_to_sign);
         assert_eq!(verification, true);
     }
@@ -44,8 +44,8 @@ mod ed25519 {
     #[test]
     pub fn verify_with_public_key_threadpool() {
         let key_pair = get_ed25519_key_pair_threadpool();
-        let message_to_sign = b"Hello World Message To Sign";
-        let signature = ed25519_sign_with_key_pair_threadpool(key_pair, message_to_sign);
+        let message_to_sign = b"Hello World Message To Sign".to_vec();
+        let signature = ed25519_sign_with_key_pair_threadpool(key_pair, message_to_sign.clone());
         let verification = ed25519_verify_with_public_key_threadpool(signature.public_key, signature.signature, message_to_sign);
         assert_eq!(verification, true);
     }
@@ -53,8 +53,8 @@ mod ed25519 {
     #[test]
     pub fn verify_with_key_pair() {
         let key_pair = get_ed25519_key_pair();
-        let message_to_sign = b"Hello World Message To Sign";
-        let signature = ed25519_sign_with_key_pair(key_pair, message_to_sign);
+        let message_to_sign = b"Hello World Message To Sign".to_vec();
+        let signature = ed25519_sign_with_key_pair(key_pair.clone(), message_to_sign.clone());
         let verification = ed25519_verify_with_key_pair(key_pair, signature.signature, message_to_sign);
         assert_eq!(verification, true);
     }
@@ -62,8 +62,8 @@ mod ed25519 {
     #[test]
     pub fn verify_with_key_pair_threadpool() {
         let key_pair = get_ed25519_key_pair();
-        let message_to_sign = b"Hello World Message To Sign";
-        let signature = ed25519_sign_with_key_pair_threadpool(key_pair, message_to_sign);
+        let message_to_sign = b"Hello World Message To Sign".to_vec();
+        let signature = ed25519_sign_with_key_pair_threadpool(key_pair.clone(), message_to_sign.clone());
         let verification = ed25519_verify_with_key_pair_threadpool(key_pair, signature.signature, message_to_sign);
         assert_eq!(verification, true);
     }

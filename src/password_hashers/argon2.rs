@@ -14,24 +14,24 @@ pub struct CASArgon;
 
 impl CASArgon {
 
-    pub fn derive_aes_128_key(password: &[u8]) -> [u8; 16] {
+    pub fn derive_aes_128_key(password: Vec<u8>) -> Vec<u8> {
         let mut rng = OsRng;
         let mut salt: [u8; 16] = [0; 16];
         rng.fill_bytes(&mut salt);
 
-        let mut key = [0u8; 16];
-        Argon2::default().hash_password_into(password, &salt, &mut key).unwrap();
-        key
+        let mut key = Box::new([0u8; 16]);
+        Argon2::default().hash_password_into(password.as_ref(), &salt, &mut *key).unwrap();
+        key.to_vec()
     }
 
-    pub fn derive_aes_256_key(password: &[u8]) -> [u8; 32] {
+    pub fn derive_aes_256_key(password: Vec<u8>) -> Vec<u8> {
         let mut rng = OsRng;
         let mut salt: [u8; 16] = [0; 16];
         rng.fill_bytes(&mut salt);
 
-        let mut key = [0u8; 32];
-        Argon2::default().hash_password_into(password, &salt, &mut key).unwrap();
-        key
+        let mut key = Box::new([0u8; 32]);
+        Argon2::default().hash_password_into(password.as_ref(), &salt, &mut *key).unwrap();
+        key.to_vec()
     }
 
     pub fn hash_password(password_to_hash: String) -> String {

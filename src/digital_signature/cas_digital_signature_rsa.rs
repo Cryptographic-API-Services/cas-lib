@@ -4,8 +4,8 @@ pub struct RSADigitalSignatureResult {
     pub signature: Vec<u8>,
 }
 pub struct SHAED25519DalekDigitalSignatureResult {
-    pub public_key: [u8; 32],
-    pub signature: [u8; 64]
+    pub public_key: Vec<u8>,
+    pub signature: Vec<u8>
 }
 
 pub trait RSADigitalSignature {
@@ -16,8 +16,8 @@ pub trait RSADigitalSignature {
 }
 
 pub trait ED25519DigitalSignature {
-    fn digital_signature_ed25519(data_to_sign: &[u8]) -> SHAED25519DalekDigitalSignatureResult;
-    fn digital_signature_ed25519_threadpool(data_to_sign: &[u8]) -> SHAED25519DalekDigitalSignatureResult;
-    fn digital_signature_ed25519_verify(public_key: [u8; 32], data_to_verify: &[u8], signature: [u8; 64]) -> bool;
-    fn digital_signature_ed25519_verify_threadpool(public_key: [u8; 32], data_to_verify: &[u8], signature: [u8; 64]) -> bool;
+    fn digital_signature_ed25519(data_to_sign: Vec<u8>) -> SHAED25519DalekDigitalSignatureResult;
+    fn digital_signature_ed25519_threadpool(data_to_sign: Vec<u8>) -> SHAED25519DalekDigitalSignatureResult;
+    fn digital_signature_ed25519_verify(public_key: Vec<u8>, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool;
+    fn digital_signature_ed25519_verify_threadpool(public_key: Vec<u8>, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool;
 }
