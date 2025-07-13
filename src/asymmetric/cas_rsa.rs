@@ -13,8 +13,8 @@ use super::types::{CASRSAEncryption, RSAKeyPairResult};
 pub struct CASRSA;
 
 impl CASRSAEncryption for CASRSA {
-    //// Generates an RSA key pair of the specified size.
-    //// The key size must be at of a supported kind like 1024, 2048, 4096 bits.
+    /// Generates an RSA key pair of the specified size.
+    /// The key size must be at of a supported kind like 1024, 2048, 4096 bits.
     fn generate_rsa_keys(key_size: usize) -> RSAKeyPairResult {
         // TODO: do a check for key_size, if it is too small, return an error
         let mut rng: OsRng = OsRng;
@@ -34,8 +34,8 @@ impl CASRSAEncryption for CASRSA {
         result
     }
 
-    //// Generates an RSA key pair of the specified size on the threadpool.
-    //// The key size must be at of a supported kind like 1024, 2048, 4096 bits.
+    /// Generates an RSA key pair of the specified size on the threadpool.
+    /// The key size must be at of a supported kind like 1024, 2048, 4096 bits.
     fn generate_rsa_keys_threadpool(key_size: usize) -> RSAKeyPairResult {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
