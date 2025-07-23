@@ -210,6 +210,17 @@ impl CASAES128Encryption for CASAES128 {
         result
     }
 
+    /// Decrypts with AES-128-GCM taking an aes_key and aes_nonce on the threadpool
+    fn decrypt_ciphertext_threadpool2(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
+        let (sender, receiver) = mpsc::channel();
+        rayon::spawn(move || {
+            let plaintext = Self::decrypt_ciphertext(aes_key, nonce, ciphertext);
+            sender.send(plaintext).unwrap();
+        });
+        let result = receiver.recv().unwrap();
+        result
+    }
+
     /// Generates an AES-128 16-byte key from an X25519 shared secret
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> Aes128KeyFromX25519SharedSecret {
         let hk = Hkdf::<Sha256>::new(None, &shared_secret);
