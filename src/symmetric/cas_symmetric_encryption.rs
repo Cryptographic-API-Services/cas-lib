@@ -10,6 +10,8 @@ pub struct Aes128KeyFromX25519SharedSecret {
 
 pub trait CASAES256Encryption {
     fn generate_key() -> Vec<u8>;
+    fn testing() -> String;
+    fn testing() -> String;
     fn generate_key_threadpool() -> Vec<u8>;
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8>;
     fn encrypt_plaintext_threadpool(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8>;
