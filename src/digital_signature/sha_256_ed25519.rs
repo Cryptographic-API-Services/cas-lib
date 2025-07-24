@@ -11,6 +11,7 @@ use super::cas_digital_signature_rsa::{
 pub struct SHA256ED25519DigitalSignature;
 
 impl ED25519DigitalSignature for SHA256ED25519DigitalSignature {
+    /// Creates a digital signature using SHA-256 as the hashing algorithm and Ed25519-Dalek as the signing algorithm.
     fn digital_signature_ed25519(data_to_sign: Vec<u8>) -> SHAED25519DalekDigitalSignatureResult {
         let mut hasher = Sha3_256::new();
         hasher.update(data_to_sign);
@@ -25,6 +26,7 @@ impl ED25519DigitalSignature for SHA256ED25519DigitalSignature {
         result
     }
 
+    /// Verifys a digital signature using SHA-256 as the hashing algorithm and Ed25519-Dalek as the verification algorithm.
     fn digital_signature_ed25519_verify(
         public_key: Vec<u8>,
         data_to_verify: Vec<u8>,
@@ -37,6 +39,7 @@ impl ED25519DigitalSignature for SHA256ED25519DigitalSignature {
         return ed25519_verify_with_public_key(public_key, signature, sha_hash_bytes);
     }
     
+    /// Creates a digital signature using SHA-256 as the hashing algorithm and Ed25519-Dalek as the signing algorithm on the threadpool.
     fn digital_signature_ed25519_threadpool(data_to_sign: Vec<u8>) -> SHAED25519DalekDigitalSignatureResult {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -47,6 +50,7 @@ impl ED25519DigitalSignature for SHA256ED25519DigitalSignature {
         result
     }
     
+    /// Verifys a digital signature using SHA-256 as the hashing algorithm and Ed25519-Dalek as the verification algorithm on the threadpool.
     fn digital_signature_ed25519_verify_threadpool(public_key: Vec<u8>, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
