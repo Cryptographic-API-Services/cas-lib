@@ -9,6 +9,8 @@ use rand::rngs::OsRng;
 
 use super::cas_ed25519::Ed25519ByteSignature;
 
+/// Generates a new Ed25519 key pair.
+/// Returns the key pair as a vector of bytes.
 pub fn get_ed25519_key_pair() -> Vec<u8> {
     let mut csprng = OsRng;
     let keypair = SigningKey::generate(&mut csprng);
@@ -16,6 +18,8 @@ pub fn get_ed25519_key_pair() -> Vec<u8> {
     keypair_vec
 }
 
+/// Generates a new Ed25519 key pair on the threadpool.
+/// Returns the key pair as a vector of bytes.
 pub fn get_ed25519_key_pair_threadpool() -> Vec<u8> {
     let (sender, receiver) = mpsc::channel();
     rayon::spawn(move || {
@@ -26,6 +30,8 @@ pub fn get_ed25519_key_pair_threadpool() -> Vec<u8> {
     result
 }
 
+/// Signs a message using the provided Ed25519 key pair.
+/// Returns the signature and public key as an Ed25519ByteSignature.
 pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -> Ed25519ByteSignature {
     let mut key_pair_box = Box::new([0u8; 32]);
     key_pair_box.copy_from_slice(&key_pair);
@@ -41,6 +47,8 @@ pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -
     result
 }
 
+/// Signs a message using the provided Ed25519 key pair on the threadpool.
+/// Returns the signature and public key as an Ed25519ByteSignature.
 pub fn ed25519_sign_with_key_pair_threadpool(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -> Ed25519ByteSignature {
     let (sender, receiver) = mpsc::channel(); 
     rayon::spawn(move || {
@@ -51,7 +59,9 @@ pub fn ed25519_sign_with_key_pair_threadpool(key_pair: Vec<u8>, message_to_sign:
     result
 }
 
-
+/// Verifies a signature using the provided Ed25519 key pair.
+/// Returns true if the signature is valid, false otherwise.
+/// The key pair is expected to be in byte array format.
 pub fn ed25519_verify_with_key_pair(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
     let mut key_pair_box = Box::new([0u8; 32]);
     key_pair_box.copy_from_slice(&key_pair);
@@ -63,6 +73,9 @@ pub fn ed25519_verify_with_key_pair(key_pair: Vec<u8>, signature: Vec<u8>, messa
     return keypair.verify(&message, &signature).is_ok();
 }
 
+/// Verifies a signature using the provided Ed25519 key pair on the threadpool.
+/// Returns true if the signature is valid, false otherwise.
+/// The key pair is expected to be in byte array format.
 pub fn ed25519_verify_with_key_pair_threadpool(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
     let (sender, receiver) = mpsc::channel();
     rayon::spawn(move || {
@@ -73,6 +86,9 @@ pub fn ed25519_verify_with_key_pair_threadpool(key_pair: Vec<u8>, signature: Vec
     result
 }
 
+/// Verifies a signature using the provided public key.
+/// Returns true if the signature is valid, false otherwise.
+/// The public key and signature are expected to be in byte array format.
 pub fn ed25519_verify_with_public_key(public_key: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
     let mut public_key_box = Box::new([0u8; 32]);
     public_key_box.copy_from_slice(&public_key);
@@ -87,6 +103,9 @@ pub fn ed25519_verify_with_public_key(public_key: Vec<u8>, signature: Vec<u8>, m
         .is_ok();
 }
 
+/// Verifies a signature using the provided public key on the threadpool.
+/// Returns true if the signature is valid, false otherwise.
+/// The public key and signature are expected to be in byte array format.
 pub fn ed25519_verify_with_public_key_threadpool(public_key: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
     let (sender, receiver) = mpsc::channel();
     rayon::spawn(move || {

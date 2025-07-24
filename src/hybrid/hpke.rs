@@ -17,6 +17,8 @@ type Kdf = HkdfSha512;
 pub struct CASHPKE;
 
 impl CASHybrid for CASHPKE {
+    /// Generates a key pair for HPKE using X25519 as the KEM algorithm.
+    /// Returns the private key, public key, and an info string.
     fn generate_key_pair() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut csprng = StdRng::from_entropy();
         let (private_key, public_key) = Kem::gen_keypair(&mut csprng);
@@ -27,12 +29,16 @@ impl CASHybrid for CASHPKE {
         )
     }
 
+    /// Generates an info string for HPKE.
+    /// Returns a vector of bytes representing the info string.
     fn generate_info_str() -> Vec<u8> {
         let uuid = Uuid::new_v4();
         let uuid_bytes: Vec<u8> = uuid.as_bytes().to_vec();
         uuid_bytes
     }
 
+    /// Encrypts data using HPKE with the provided public key and info string.
+    /// Returns the encapsulated key, ciphertext, and tag.
     fn encrypt(
         plaintext: Vec<u8>,
         public_key: Vec<u8>,
@@ -60,6 +66,8 @@ impl CASHybrid for CASHPKE {
         )
     }
 
+    /// Decrypts data using HPKE with the provided private key, encapsulated key, tag, and info string.
+    /// Returns the decrypted plaintext.
     fn decrypt(
         ciphertext: Vec<u8>,
         private_key: Vec<u8>,

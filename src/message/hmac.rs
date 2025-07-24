@@ -8,6 +8,8 @@ type HmacSha256 = Hmac<Sha256>;
 pub struct HMAC;
 
 impl CASHMAC for HMAC {
+    /// Signs a message using HMAC with SHA-256.
+    /// Returns the signature as a vector of bytes.
     fn sign(key: Vec<u8>, message: Vec<u8>) -> Vec<u8> {
         let mut mac = HmacSha256::new_from_slice(&key).unwrap();
         mac.update(&message);
@@ -15,6 +17,8 @@ impl CASHMAC for HMAC {
         result
     }
 
+    /// Signs a message using HMAC with SHA-256 on the threadpool.
+    /// Returns the signature as a vector of bytes.
     fn sign_threadpool(key: Vec<u8>, message: Vec<u8>) -> Vec<u8> {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -25,12 +29,16 @@ impl CASHMAC for HMAC {
         result
     }
 
+    /// Verifies a signature using HMAC with SHA-256.
+    /// Returns true if the signature is valid, false otherwise.
     fn verify(key: Vec<u8>, message: Vec<u8>, signature: Vec<u8>) -> bool {
         let mut mac = HmacSha256::new_from_slice(&key).unwrap();
         mac.update(&message);
         return mac.verify_slice(&signature).is_ok();
     }
 
+    /// Verifies a signature using HMAC with SHA-256 on the threadpool.
+    /// Returns true if the signature is valid, false otherwise.
     fn verify_threadpool(key: Vec<u8>, message: Vec<u8>, signature: Vec<u8>) -> bool {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
