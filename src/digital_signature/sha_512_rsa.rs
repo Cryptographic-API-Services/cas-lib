@@ -13,6 +13,7 @@ use super::cas_digital_signature_rsa::{RSADigitalSignatureResult, RSADigitalSign
 pub struct SHA512RSADigitalSignature;
 
 impl RSADigitalSignature for SHA512RSADigitalSignature {
+    /// Creates a digital signature using SHA-512 as the hashing algorithm and RSA as the signing algorithm.
     fn digital_signature_rsa(
         rsa_key_size: u32,
         data_to_sign: Vec<u8>,
@@ -41,6 +42,7 @@ impl RSADigitalSignature for SHA512RSADigitalSignature {
         result
     }
 
+    /// Creates a digital signature using SHA-512 as the hashing algorithm and RSA as the signing algorithm on the threadpool.
     fn digital_signature_rsa_threadpool(rsa_key_size: u32, data_to_sign: Vec<u8>) -> RSADigitalSignatureResult {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
@@ -51,6 +53,8 @@ impl RSADigitalSignature for SHA512RSADigitalSignature {
         result
     }
 
+    /// Verifys a digital signature using SHA-512 as the hashing algorithm and RSA as the verification algorithm.
+    /// The public key is expected to be in PEM format.
     fn verify_rsa(public_key: String, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool {
         let mut hasher = Sha3_512::new();
         hasher.update(data_to_verify);
@@ -68,6 +72,8 @@ impl RSADigitalSignature for SHA512RSADigitalSignature {
         }
     }
 
+    /// Verifys a digital signature using SHA-512 as the hashing algorithm and RSA as the verification algorithm on the threadpool.
+    /// The public key is expected to be in PEM format.
     fn verify_rsa_threadpool(public_key: String, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool {
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
