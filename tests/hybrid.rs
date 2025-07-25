@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod hybrid {
-    use std::{os::windows::fs::FileExt, path::Path};
+    use std::path::Path;
 
     use cas_lib::hybrid::{cas_hybrid::CASHybrid, hpke::CASHPKE};
 
