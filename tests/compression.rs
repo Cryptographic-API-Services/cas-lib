@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod compression {
-    use cas_lib::compression::zstd::{self, compress, decompress};
+    use cas_lib::compression::zstd::{compress, decompress};
     #[test]
     pub fn test_compression() {
 
