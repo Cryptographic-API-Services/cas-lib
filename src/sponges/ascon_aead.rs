@@ -2,7 +2,7 @@
 use std::sync::mpsc;
 
 use aes_gcm::AeadCore;
-use ascon_aead::{aead::{generic_array::GenericArray, Aead, KeyInit, OsRng}, Ascon128};
+use ascon_aead::{aead::{generic_array::GenericArray, Aead, KeyInit, OsRng}, AsconAead128 as Ascon128};
 
 use super::cas_ascon_aead::{CASAsconAead};
 pub struct AsconAead;
