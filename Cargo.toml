@@ -14,7 +14,7 @@ crate-type = ["lib"]
 [dependencies]
 aes-gcm = "0.10.3"
 argon2 = "0.5.3"
-bcrypt = "0.15.0"
+bcrypt = "0.17.0"
 blake2 = "0.10.6"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
