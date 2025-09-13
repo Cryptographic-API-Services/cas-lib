@@ -25,3 +25,10 @@ pub trait CASAES128Encryption {
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8>;
 }
+
+pub trait Chacha20Poly1305Encryption {
+    fn generate_key() -> Vec<u8>;
+    fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8>;
+    fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8>;
+    fn generate_nonce() -> Vec<u8>;
+}

@@ -4,7 +4,7 @@ use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encr
 
 #[cfg(test)]
 mod tests {
-    use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, symmetric::{aes::CASAES128, cas_symmetric_encryption::CASAES128Encryption}};
+    use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, symmetric::{aes::CASAES128, cas_symmetric_encryption::{CASAES128Encryption, Chacha20Poly1305Encryption}, chacha20poly1305::CASChacha20Poly1305}};
 
     use super::*;
     #[test]
@@ -79,6 +79,22 @@ mod tests {
 
         let bob_key = <CASAES128 as CASAES128Encryption>::key_from_x25519_shared_secret(alice_shared_secret);
         let decrypted_bytes = <CASAES128 as CASAES128Encryption>::decrypt_ciphertext(bob_key.aes_key, bob_key.aes_nonce, encrypted_bytes);
+        let mut file =  File::create("decrypted.docx").unwrap();
+        file.write_all(&decrypted_bytes).unwrap();
+        assert_eq!(file_bytes, decrypted_bytes);
+    }
+
+    #[test]
+    fn test_chacha20_poly1305() {
+        let path = Path::new("tests/test.docx");
+        let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
+        let chacha20_nonce = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_nonce();
+        let chacha20_key = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_key();
+        let encrypted_bytes = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::encrypt_plaintext(chacha20_key.clone(), chacha20_nonce.clone(), file_bytes.clone());
+        let mut file =  File::create("encrypted.docx").unwrap();
+        file.write_all(&encrypted_bytes).unwrap();
+
+        let decrypted_bytes = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::decrypt_ciphertext(chacha20_key, chacha20_nonce, encrypted_bytes);
         let mut file =  File::create("decrypted.docx").unwrap();
         file.write_all(&decrypted_bytes).unwrap();
         assert_eq!(file_bytes, decrypted_bytes);
