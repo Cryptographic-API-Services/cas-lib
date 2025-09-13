@@ -1,7 +1,7 @@
 extern crate ed25519_dalek;
 extern crate rand;
 
-use std::sync::mpsc;
+
 
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use ed25519_dalek::Signature;
@@ -16,18 +16,6 @@ pub fn get_ed25519_key_pair() -> Vec<u8> {
     let keypair = SigningKey::generate(&mut csprng);
     let keypair_vec = keypair.as_bytes().to_vec();
     keypair_vec
-}
-
-/// Generates a new Ed25519 key pair on the threadpool.
-/// Returns the key pair as a vector of bytes.
-pub fn get_ed25519_key_pair_threadpool() -> Vec<u8> {
-    let (sender, receiver) = mpsc::channel();
-    rayon::spawn(move || {
-        let result = get_ed25519_key_pair();
-        sender.send(result).unwrap();
-    });
-    let result = receiver.recv().unwrap();
-    result
 }
 
 /// Signs a message using the provided Ed25519 key pair.
@@ -47,18 +35,6 @@ pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -
     result
 }
 
-/// Signs a message using the provided Ed25519 key pair on the threadpool.
-/// Returns the signature and public key as an Ed25519ByteSignature.
-pub fn ed25519_sign_with_key_pair_threadpool(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -> Ed25519ByteSignature {
-    let (sender, receiver) = mpsc::channel(); 
-    rayon::spawn(move || {
-        let result = ed25519_sign_with_key_pair(key_pair, message_to_sign);
-        sender.send(result).unwrap();
-    });
-    let result = receiver.recv().unwrap();
-    result
-}
-
 /// Verifies a signature using the provided Ed25519 key pair.
 /// Returns true if the signature is valid, false otherwise.
 /// The key pair is expected to be in byte array format.
@@ -71,19 +47,6 @@ pub fn ed25519_verify_with_key_pair(key_pair: Vec<u8>, signature: Vec<u8>, messa
     let keypair = SigningKey::from_bytes(&*key_pair_box);
     let signature = Signature::from_bytes(&*signature_box);
     return keypair.verify(&message, &signature).is_ok();
-}
-
-/// Verifies a signature using the provided Ed25519 key pair on the threadpool.
-/// Returns true if the signature is valid, false otherwise.
-/// The key pair is expected to be in byte array format.
-pub fn ed25519_verify_with_key_pair_threadpool(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
-    let (sender, receiver) = mpsc::channel();
-    rayon::spawn(move || {
-        let result = ed25519_verify_with_key_pair(key_pair, signature, message);
-        sender.send(result).unwrap();
-    });
-    let result = receiver.recv().unwrap();
-    result
 }
 
 /// Verifies a signature using the provided public key.
@@ -101,17 +64,4 @@ pub fn ed25519_verify_with_public_key(public_key: Vec<u8>, signature: Vec<u8>, m
     return verifying_key
         .verify_strict(&message, &signature_parsed)
         .is_ok();
-}
-
-/// Verifies a signature using the provided public key on the threadpool.
-/// Returns true if the signature is valid, false otherwise.
-/// The public key and signature are expected to be in byte array format.
-pub fn ed25519_verify_with_public_key_threadpool(public_key: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> bool {
-    let (sender, receiver) = mpsc::channel();
-    rayon::spawn(move || {
-        let result = ed25519_verify_with_public_key(public_key, signature, message);
-        sender.send(result).unwrap();
-    });
-    let result = receiver.recv().unwrap();
-    result
 }

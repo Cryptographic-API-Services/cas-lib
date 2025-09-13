@@ -1,5 +1,3 @@
-use std::sync::mpsc;
-
 use rand::rngs::OsRng;
 use rsa::{
     pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey},
@@ -34,18 +32,6 @@ impl CASRSAEncryption for CASRSA {
         result
     }
 
-    /// Generates an RSA key pair of the specified size on the threadpool.
-    /// The key size must be at of a supported kind like 1024, 2048, 4096 bits.
-    fn generate_rsa_keys_threadpool(key_size: usize) -> RSAKeyPairResult {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let thread_result = Self::generate_rsa_keys(key_size);
-            sender.send(thread_result).unwrap();
-        });
-        let thread_result: RSAKeyPairResult = receiver.recv().unwrap();
-        thread_result
-    }
-
     /// Sign the given hash with the provided private key of the RSA key pair.
     /// The parameter `hash` doesn't necessarily have to be a hash, it can be any data that you want to sign.
     fn sign(private_key: String, hash: Vec<u8>) -> Vec<u8> {
@@ -56,19 +42,6 @@ impl CASRSAEncryption for CASRSA {
         signed_data
     }
 
-    /// Sign the given hash with the provided private key of the RSA key pair on the threadpool.
-    /// The parameter `hash` doesn't necessarily have to be a hash, it can be any data that you want to sign.
-    /// Returns the signed data as a byte vector.
-    /// This is useful for signing data in a non-blocking way.
-    fn sign_threadpool(private_key: String, hash: Vec<u8>) -> Vec<u8> {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let signed_data = Self::sign(private_key, hash);
-            sender.send(signed_data).unwrap();
-        });
-        let signed_data = receiver.recv().unwrap();
-        signed_data
-    }
 
     /// Verify the signature of the given hash with the provided public key of the RSA key pair.
     /// The parameter `hash` doesn't necessarily have to be a hash, it can be any data that you want to verify.
@@ -81,18 +54,5 @@ impl CASRSAEncryption for CASRSA {
         } else {
             return false;
         }
-    }
-
-    /// Verify the signature of the given hash with the provided public key of the RSA key pair on the threadpool.
-    /// The parameter `hash` doesn't necessarily have to be a hash, it can be any data that you want to verify.
-    /// Returns true if the signature is valid, false otherwise.
-    fn verify_threadpool(public_key: String, hash: Vec<u8>, signed_text: Vec<u8>) -> bool {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let verified = Self::verify(public_key, hash, signed_text);
-            sender.send(verified).unwrap();
-        });
-        let verified = receiver.recv().unwrap();
-        verified
     }
 }
