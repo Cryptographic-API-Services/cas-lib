@@ -1,8 +1,3 @@
-
-
-
-use std::sync::mpsc;
-
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
@@ -57,34 +52,5 @@ impl CASArgon {
         return Argon2::default()
             .verify_password(password_to_verify.as_bytes(), &hashed_password)
             .is_ok();
-    }
-    
-    /// Hashes a password using Argon2 on the threadpool.
-    /// Returns the hashed password as a string.
-    /// This function spawns a thread to perform the hashing.
-    /// The password to hash is expected to be in string format.
-    /// Returns the hashed password.
-    pub fn hash_password_threadpool(password: String) -> String {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let hash = Self::hash_password(password);
-            sender.send(hash).unwrap();
-        });
-        let hash = receiver.recv().unwrap();
-        hash
-    }
-    
-    /// Verifies a password against a hashed password using Argon2 on the threadpool.
-    /// Returns true if the password matches the hashed password, false otherwise.
-    /// This function spawns a thread to perform the verification.
-    /// The hashed password and password to verify are expected to be in string format.
-    pub fn verify_password_threadpool(hashed_password: String, password_to_verify: String) -> bool {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let hash = Self::verify_password(hashed_password, password_to_verify);
-            sender.send(hash).unwrap();
-        });
-        let hash = receiver.recv().unwrap();
-        hash
     }
 }

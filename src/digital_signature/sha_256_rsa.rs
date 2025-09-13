@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+
 
 use rand::rngs::OsRng;
 use rsa::{
@@ -43,17 +43,6 @@ impl RSADigitalSignature for SHA256RSADigitalSignature {
         result
     }
 
-    /// Creates a digital signature using SHA-256 as the hashing algorithm and RSA as the signing algorithm on the threadpool.
-    fn digital_signature_rsa_threadpool(rsa_key_size: u32, data_to_sign: Vec<u8>) -> RSADigitalSignatureResult {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let result = <SHA256RSADigitalSignature as RSADigitalSignature>::digital_signature_rsa(rsa_key_size, data_to_sign);
-            sender.send(result).unwrap();
-        });
-        let result = receiver.recv().unwrap();
-        result
-    }
-
     /// Verifys a digital signature using SHA-256 as the hashing algorithm and RSA as the verification algorithm.
     /// The public key is expected to be in PEM format.
     fn verify_rsa(public_key: String, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool {
@@ -71,17 +60,5 @@ impl RSADigitalSignature for SHA256RSADigitalSignature {
         } else {
             return false;
         }
-    }
-
-    /// Verifys a digital signature using SHA-256 as the hashing algorithm and RSA as the verification algorithm on the threadpool.
-    /// The public key is expected to be in PEM format.
-    fn verify_rsa_threadpool(public_key: String, data_to_verify: Vec<u8>, signature: Vec<u8>) -> bool {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let result = <SHA256RSADigitalSignature as RSADigitalSignature>::verify_rsa(public_key, data_to_verify, signature);
-            sender.send(result).unwrap();
-        });
-        let result = receiver.recv().unwrap();
-        result
     }
 }
