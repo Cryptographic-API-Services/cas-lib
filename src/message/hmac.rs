@@ -1,4 +1,3 @@
-use std::sync::mpsc;
 
 use super::cas_hmac::CASHMAC;
 use hmac::{Hmac, Mac};
@@ -17,17 +16,7 @@ impl CASHMAC for HMAC {
         result
     }
 
-    /// Signs a message using HMAC with SHA-256 on the threadpool.
-    /// Returns the signature as a vector of bytes.
-    fn sign_threadpool(key: Vec<u8>, message: Vec<u8>) -> Vec<u8> {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let result = Self::sign(key, message);
-            sender.send(result).unwrap();
-        });
-        let result = receiver.recv().unwrap();
-        result
-    }
+    
 
     /// Verifies a signature using HMAC with SHA-256.
     /// Returns true if the signature is valid, false otherwise.
@@ -37,15 +26,5 @@ impl CASHMAC for HMAC {
         return mac.verify_slice(&signature).is_ok();
     }
 
-    /// Verifies a signature using HMAC with SHA-256 on the threadpool.
-    /// Returns true if the signature is valid, false otherwise.
-    fn verify_threadpool(key: Vec<u8>, message: Vec<u8>, signature: Vec<u8>) -> bool {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let result = Self::verify(key, message, signature);
-            sender.send(result).unwrap();
-        });
-        let result = receiver.recv().unwrap();
-        result
-    }
+
 }
