@@ -39,32 +39,4 @@ impl CASKeyExchange for X25519 {
         let public_key = PublicKey::from(*users_public_key_box);
         return secret_key.diffie_hellman(&public_key).as_bytes().to_vec();
     }
-    
-    /// Generates a secret key and public key using X25519 on the threadpool.
-    /// Returns a result containing the secret key and public key as vectors of bytes.
-    /// This function spawns a thread to perform the key generation.
-    /// Returns the result of the key generation.
-    fn generate_secret_and_public_key_threadpool() -> X25519SecretPublicKeyResult {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let result = <X25519 as CASKeyExchange>::generate_secret_and_public_key();
-            sender.send(result).unwrap();
-        });
-        let result = receiver.recv().unwrap();
-        result
-    }
-    
-    /// Performs a Diffie-Hellman key exchange using the provided secret key and user's public key on the threadpool.
-    /// Returns the shared secret as a vector of bytes.
-    /// The shared secret is computed as the Diffie-Hellman result of the secret key and the user's public key.
-    /// The secret key and user's public key are expected to be in byte array format.
-    fn diffie_hellman_threadpool(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> Vec<u8> {
-        let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
-            let result = <X25519 as CASKeyExchange>::diffie_hellman(my_secret_key, users_public_key);
-            sender.send(result).unwrap();
-        });
-        let result = receiver.recv().unwrap();
-        result
-    }
 }
