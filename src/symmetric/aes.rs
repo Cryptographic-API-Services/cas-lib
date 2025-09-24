@@ -10,7 +10,7 @@ use aes_gcm::{
 };
 use sha2::Sha256;
 
-use super::cas_symmetric_encryption::{Aes128KeyFromX25519SharedSecret, Aes256KeyFromX25519SharedSecret, CASAES128Encryption, CASAES256Encryption};
+use super::cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption};
 pub struct CASAES128;
 pub struct CASAES256;
 
@@ -48,17 +48,11 @@ impl CASAES256Encryption for CASAES256 {
     }
 
     /// Creates an AES-256 key 32-byte key from an X25519 Shared Secret
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> Aes256KeyFromX25519SharedSecret {
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> Vec<u8> {
         let hk = Hkdf::<Sha256>::new(None, &shared_secret);
-        let mut aes_key    = Box::new([0u8; 32]);
-        let mut aes_nonce = Box::new([0u8; 12]);
+        let mut aes_key: Box<[u8; 32]> = Box::new([0u8; 32]);
         hk.expand(b"aes key", &mut *aes_key).unwrap();
-        hk.expand(b"nonce",   &mut *aes_nonce).unwrap();
-        let result = Aes256KeyFromX25519SharedSecret {
-            aes_key: aes_key.to_vec(),
-            aes_nonce: aes_nonce.to_vec(),
-        };
-        result
+        aes_key.to_vec()
     }
 
     
@@ -110,17 +104,11 @@ impl CASAES128Encryption for CASAES128 {
     
 
     /// Generates an AES-128 16-byte key from an X25519 shared secret
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> Aes128KeyFromX25519SharedSecret {
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> Vec<u8> {
         let hk = Hkdf::<Sha256>::new(None, &shared_secret);
-        let mut aes_key    = Box::new([0u8; 16]);
-        let mut aes_nonce = Box::new([0u8; 12]);
+        let mut aes_key = Box::new([0u8; 16]);
         hk.expand(b"aes key", &mut *aes_key).unwrap();
-        hk.expand(b"nonce",   &mut *aes_nonce).unwrap();
-        let result = Aes128KeyFromX25519SharedSecret {
-            aes_key: aes_key.to_vec(),
-            aes_nonce: aes_nonce.to_vec(),
-        };
-        result
+        aes_key.to_vec()
     }
 
     
