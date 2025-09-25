@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod ed25519 {
+mod signatures {
     use cas_lib::signatures::ed25519::{ed25519_sign_with_key_pair, ed25519_verify_with_key_pair, ed25519_verify_with_public_key, get_ed25519_key_pair};
 
     #[test]

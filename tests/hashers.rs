@@ -3,7 +3,7 @@ use std::path::Path;
 use cas_lib::hashers::{cas_hasher::CASHasher, sha::CASSHA};
 
 #[cfg(test)]
-mod tests {
+mod hashers {
     use super::*;
 
     #[test]

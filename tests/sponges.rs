@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod sponges {
     use std::{fs::File, io::Write, path::Path};
     use cas_lib::sponges::{ascon_aead::AsconAead, cas_ascon_aead::CASAsconAead};
     

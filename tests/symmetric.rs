@@ -3,8 +3,10 @@ use std::{fs::{File}, io::Write, path::Path};
 use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
 
 #[cfg(test)]
-mod tests {
-    use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, symmetric::{aes::CASAES128, cas_symmetric_encryption::{CASAES128Encryption, Chacha20Poly1305Encryption}, chacha20poly1305::CASChacha20Poly1305}};
+mod symmetric {
+    use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, pqc::{cas_pqc::MlKemKeyPair, ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate}}, symmetric::{aes::CASAES128, cas_symmetric_encryption::{CASAES128Encryption, Chacha20Poly1305Encryption}, chacha20poly1305::CASChacha20Poly1305}};
+    use hkdf::Hkdf;
+    use sha2::Sha256;
 
     use super::*;
     #[test]
@@ -98,6 +100,35 @@ mod tests {
         file.write_all(&encrypted_bytes).unwrap();
 
         let decrypted_bytes = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::decrypt_ciphertext(chacha20_key, chacha20_nonce, encrypted_bytes);
+        let mut file =  File::create("decrypted.docx").unwrap();
+        file.write_all(&decrypted_bytes).unwrap();
+        assert_eq!(file_bytes, decrypted_bytes);
+    }
+
+    #[test]
+    pub fn round_trip_mlkem1024_hkdf() {
+        let secret_key_public_key: MlKemKeyPair = ml_kem_1024_generate();
+        let ct = ml_kem_1024_encapsulate(secret_key_public_key.public_key).expect("encapsulate failed");
+        let ss_receiver = ml_kem_1024_decapsulate(secret_key_public_key.secret_key, ct.ciphertext).expect("decapsulate failed");
+
+        let bob_shared_secret = Hkdf::<Sha256>::new(None, &ss_receiver);
+        let alice_shared_secret = Hkdf::<Sha256>::new(None, &ct.shared_secret);
+
+        let mut aes_key = Box::new([0u8; 32]);
+        bob_shared_secret.expand(b"aes key", &mut *aes_key).unwrap();
+
+        let mut aes_key2 = Box::new([0u8; 32]);
+        alice_shared_secret.expand(b"aes key", &mut *aes_key2).unwrap();
+        assert_eq!(aes_key.to_vec(), aes_key2.to_vec());
+
+        let aes_nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+        let path = Path::new("tests/test.docx");
+        let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
+        let encrypted_bytes = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(aes_key.to_vec(), aes_nonce.clone(), file_bytes.clone());
+        let mut file =  File::create("encrypted.docx").unwrap();
+        file.write_all(&encrypted_bytes).unwrap();
+
+        let decrypted_bytes = <CASAES256 as CASAES256Encryption>::decrypt_ciphertext(aes_key2.to_vec(), aes_nonce, encrypted_bytes);
         let mut file =  File::create("decrypted.docx").unwrap();
         file.write_all(&decrypted_bytes).unwrap();
         assert_eq!(file_bytes, decrypted_bytes);
