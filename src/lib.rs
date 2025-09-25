@@ -59,3 +59,7 @@ pub mod hybrid {
     pub mod hpke;
     pub mod cas_hybrid;
 }
+
+pub mod pqc {
+    pub mod ml_kem;
+}
