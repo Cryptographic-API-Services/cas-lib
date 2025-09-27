@@ -1,4 +1,4 @@
-use aes_gcm::Key;
+use aes_gcm::{AeadCore, Key};
 
 use hkdf::Hkdf;
 use rand::rngs::OsRng;
@@ -58,9 +58,8 @@ impl CASAES256Encryption for CASAES256 {
     
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut bytes = [0u8; 12];
-        OsRng.fill_bytes(&mut bytes);
-        bytes.to_vec()
+        let mut rng = OsRng;
+        Aes256Gcm::generate_nonce(&mut rng).to_vec()
     }
 }
 
@@ -115,9 +114,8 @@ impl CASAES128Encryption for CASAES128 {
     
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut bytes = [0u8; 12];
-        OsRng.fill_bytes(&mut bytes);
-        bytes.to_vec()
+        let mut rng = OsRng;
+        Aes128Gcm::generate_nonce(&mut rng).to_vec()
     }
 
     
