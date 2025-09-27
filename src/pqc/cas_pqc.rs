@@ -14,3 +14,9 @@ pub struct MlKemEncapResult {
 pub struct MlKemSharedSecret {
     pub shared_secret: Vec<u8>,
 }
+
+#[derive(Debug, Clone)]
+pub struct SlhDsaKeyPair {
+    pub signing_key: Vec<u8>,
+    pub verification_key: Vec<u8>,
+}

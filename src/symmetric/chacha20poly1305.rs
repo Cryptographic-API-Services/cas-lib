@@ -2,7 +2,6 @@ use aes_gcm::aead::Aead;
 use aes_gcm::{AeadCore, KeyInit};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use rand::rngs::OsRng;
-use rand::RngCore;
 
 use crate::symmetric::cas_symmetric_encryption::Chacha20Poly1305Encryption;
 
