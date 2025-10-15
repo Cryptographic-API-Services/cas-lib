@@ -1,6 +1,6 @@
 [package]
 name = "cas-lib"
-version = "0.2.63"
+version = "0.2.64"
 edition = "2021"
 description = "A function wrapper layer for RustCrypto and Dalek-Cryptography. Intended to be used in FFI situations with a global heap deallactor at the top level project."
 license = "Apache-2.0"
