@@ -7,15 +7,20 @@ use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use ed25519_dalek::Signature;
 use rand::rngs::OsRng;
 
+use crate::signatures::cas_ed25519::Ed25519ByteKeyPair;
 use super::cas_ed25519::Ed25519ByteSignature;
 
 /// Generates a new Ed25519 key pair.
 /// Returns the key pair as a vector of bytes.
-pub fn get_ed25519_key_pair() -> Vec<u8> {
+pub fn get_ed25519_key_pair() -> Ed25519ByteKeyPair {
     let mut csprng = OsRng;
     let keypair = SigningKey::generate(&mut csprng);
     let keypair_vec = keypair.as_bytes().to_vec();
-    keypair_vec
+    let public_key = keypair.verifying_key().as_bytes().to_vec();
+    return Ed25519ByteKeyPair {
+        key_pair: keypair_vec,
+        public_key
+    };
 }
 
 /// Signs a message using the provided Ed25519 key pair.

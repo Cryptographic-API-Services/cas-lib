@@ -32,8 +32,6 @@ pub mod digital_signature {
     pub mod cas_digital_signature_rsa;
     pub mod sha_512_rsa;
     pub mod sha_256_rsa;
-    pub mod sha_512_ed25519;
-    pub mod sha_256_ed25519;
 }
 
 pub mod sponges {
