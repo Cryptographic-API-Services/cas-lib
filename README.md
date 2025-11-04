@@ -1,6 +1,6 @@
 # cas-lib
 
-[![image](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/7bXXCQj45q)
+[![image](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/UAGqKfmvUS)
 
 ## Crates.io / User Announcements
 You can find the official crate [here](https://crates.io/crates/cas-lib). As of this writing we have about 17K downloads, we encourage feedback/questions in the [Github issues](https://github.com/Cryptographic-API-Services/cas-lib/issues), we haven't gotten much feedback on the library considering the download size. 
