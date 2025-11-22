@@ -34,6 +34,7 @@ hkdf = "0.12.4"
 chacha20poly1305 = "0.10.1"
 slh-dsa = "0.0.3"  
 ml-kem = "0.2.1"
+tokio = "1.48.0"
 
 [profile.dev.package.num-bigint-dig]
 opt-level = 3
