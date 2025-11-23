@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+pub mod runtime;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BenchmarkRequest {

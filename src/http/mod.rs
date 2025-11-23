@@ -1,10 +1,9 @@
-use reqwest::{cookie::Jar, Client, Response};
+use reqwest::{Client, cookie::Jar};
 use std::sync::{Arc, Mutex};
-use tokio::task;
 use url::Url;
 
 pub mod types;
-use crate::http::types::BenchmarkRequest;
+use crate::http::types::{BenchmarkRequest};
 
 static API_KEY: Mutex<String> = Mutex::new(String::new());
 static BASE_URL: Mutex<String> = Mutex::new(String::new());
@@ -39,33 +38,43 @@ pub async fn set_api_key_in_cache(api_key: String) {
     set_tokens_in_cache(api_key).await;
 }
 
-pub async fn set_base_url_in_cache(base_url: String) {
+pub fn set_base_url_in_cache(base_url: String) {
     let mut url = BASE_URL.lock().unwrap();
     *url = base_url
 }
 
-async fn set_tokens_in_cache(api_key: String) {
+pub async fn set_tokens_in_cache(api_key: String) {
     let client = Client::new();
-    let testing = BASE_URL.lock().unwrap().clone();
-    let url = format!("{}/{}/APIKey/GetToken", testing, determine_api_route());
+    let base_url = BASE_URL.lock().unwrap().clone();
+    let url = format!("{}/{}/APIKey/GetToken", base_url, determine_api_route());
     let response_task = client
         .get(url)
         .header("Authorization", api_key)
         .send()
         .await;
-    let response = response_task.unwrap().json::<types::AuthResponse>();
-    let mut token = TOKEN.lock().unwrap();
-    let mut refresh_token = REFRESH_TOKEN.lock().unwrap();
-    let mut bench_mark_client = BENCHMARK_SENDER_CLIENT.lock().unwrap();
-    match response.await {
+    let response = response_task.unwrap().json::<types::AuthResponse>().await;
+    match response {
         Ok(auth_response) => {
-            *token = auth_response.token.clone();
-            *refresh_token = auth_response.refresh_token.clone();
-            *bench_mark_client = Some(create_benchmark_sender_client(auth_response.token, auth_response.refresh_token));
+            {
+                let mut token = TOKEN.lock().unwrap();
+                *token = auth_response.token.clone();
+            }
+            {
+                let mut refresh = REFRESH_TOKEN.lock().unwrap();
+                *refresh = auth_response.refresh_token.clone();
+            }
+            {
+                let mut bench_client = BENCHMARK_SENDER_CLIENT.lock().unwrap();
+                *bench_client = Some(create_benchmark_sender_client(
+                    auth_response.token,
+                    auth_response.refresh_token,
+                ));
+            }
         }
+
         Err(_) => {
-            *token = String::new();
-            *refresh_token = String::new();
+            *TOKEN.lock().unwrap() = String::new();
+            *REFRESH_TOKEN.lock().unwrap() = String::new();
         }
     }
 }
@@ -76,14 +85,12 @@ pub async fn send_benchmark(time_in_milliseconds: i64, class_name: String, metho
         method_name,
         time_in_milliseconds,
     };
-    // Spawn a background task
-    task::spawn(async move {
-        let base_url = BASE_URL.lock().unwrap().clone();
-        let client = BENCHMARK_SENDER_CLIENT.lock().unwrap().as_ref().unwrap().clone();
-        client
-            .post(format!("{}/{}/Benchmark", base_url, determine_api_route()))
-            .json(&payload)
-            .send()
-            .await
-    });
+    let base_url = BASE_URL.lock().unwrap().clone();
+    let client = BENCHMARK_SENDER_CLIENT.lock().unwrap().as_ref().unwrap().clone();
+    
+    let response = client
+        .post(format!("{}/{}/Benchmark", base_url, determine_api_route()))
+        .json(&payload)
+        .send()
+        .await;
 }
