@@ -70,14 +70,14 @@ async fn set_tokens_in_cache(api_key: String) {
     }
 }
 
-pub async fn send_benchmark(time_in_milliseconds: i64, class_name: String, method_name: String) -> Response {
+pub async fn send_benchmark(time_in_milliseconds: i64, class_name: String, method_name: String) {
     let payload = BenchmarkRequest {
         class_name,
         method_name,
         time_in_milliseconds,
     };
     // Spawn a background task
-    let response = task::spawn(async move {
+    task::spawn(async move {
         let base_url = BASE_URL.lock().unwrap().clone();
         let client = BENCHMARK_SENDER_CLIENT.lock().unwrap().as_ref().unwrap().clone();
         client
@@ -86,5 +86,4 @@ pub async fn send_benchmark(time_in_milliseconds: i64, class_name: String, metho
             .send()
             .await
     });
-    response.await.unwrap().unwrap()
 }
