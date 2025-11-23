@@ -1,0 +1,249 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug unit tests in library 'cas_lib'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--lib",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": [
+                "--nocapture"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+            "console": "integratedTerminal"
+        },
+
+        // Integration tests
+        {
+            "name": "Debug integration test: asymmetric",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=asymmetric",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: compression",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=compression",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: digital_signatures",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=digital_signatures",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: hashers",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=hashers",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: http",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=http",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: hybrid",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=hybrid",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: key_exchange",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=key_exchange",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: message",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=message",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: password_hashers",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=password_hashers",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: pqc",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=pqc",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: signatures",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=signatures",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: sponges",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=sponges",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug integration test: symmetric",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=symmetric",
+                    "--no-run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "env": { "RUST_BACKTRACE": "1" },
+            "console": "integratedTerminal"
+        }
+    ]
+}
