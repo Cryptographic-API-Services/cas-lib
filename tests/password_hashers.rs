@@ -4,6 +4,14 @@ mod password_hashers {
     use cas_lib::{password_hashers::{argon2::CASArgon, bcrypt::CASBCrypt, cas_password_hasher::CASPasswordHasher, scrypt::CASScrypt}, symmetric::{aes::{CASAES128, CASAES256}, cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption}}};
     
     #[test]
+    pub fn argon2_hash_with_parameters() {
+        let password = "BadPassword".to_string();
+        let hash = CASArgon::hash_password_parameters(1024, 5, 5, password.clone());
+        let verification = CASArgon::verify_password(hash, password);
+        assert_eq!(true, verification);
+    }
+
+    #[test]
     pub fn argon2_derive_aes_128_and_encrypt() {
         let password = b"BadPassword".to_vec(); // do not use this as a password.
         let key = CASArgon::derive_aes_128_key(password);
