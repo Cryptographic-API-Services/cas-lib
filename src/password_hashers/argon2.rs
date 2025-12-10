@@ -1,6 +1,6 @@
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Params
 };
 use rand::RngCore;
 
@@ -9,6 +9,20 @@ pub struct CASArgon;
 
 impl CASArgon {
 
+    /// Hashes a password using Argon2 with custom parameters.
+    /// Returns the hashed password as a string.
+    /// Parameters:
+    /// - memory_cost: Memory cost in kibibytes.
+    /// - iterations: Number of iterations.
+    /// - parallelism: Degree of parallelism.
+    /// - password_to_hash: The password to be hashed.
+    pub fn hash_password_parameters(memory_cost: u32, iterations: u32, parallelism: u32, password_to_hash: String) -> String {
+        let params = Params::new(memory_cost * 1024, iterations, parallelism, None).unwrap();
+        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = argon2.hash_password(password_to_hash.as_bytes(), &salt).unwrap();
+        hash.to_string()
+    }
     /// Derives a 128-bit AES key from a password using Argon2.
     /// Returns the derived key as a vector of bytes.
     pub fn derive_aes_128_key(password: Vec<u8>) -> Vec<u8> {
