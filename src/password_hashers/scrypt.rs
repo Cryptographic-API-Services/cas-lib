@@ -11,6 +11,11 @@ pub struct CASScrypt;
 
 impl CASScrypt {
     /// Hashes a passwith using Scrypt with custom params.
+    /// Parameters:
+    /// - password_to_hash: The password to be hashed.
+    /// - cpu_memory_cost: log₂ of the Scrypt parameter `N`, the work factor.
+    /// - block_size: `r` parameter: resource usage.
+    /// - parallelism: `p` parameter: parallelization.
     pub fn hash_password_customized(password_to_hash: String, cpu_memory_cost: u8, block_size: u32, parallelism: u32) -> String {
         let salt = SaltString::generate(&mut OsRng);
         let params = Params::new(cpu_memory_cost, block_size, parallelism, 32).unwrap();
