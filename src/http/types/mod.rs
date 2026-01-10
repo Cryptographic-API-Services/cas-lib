@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub mod runtime;
 
@@ -10,7 +10,7 @@ pub struct BenchmarkRequest {
     pub time_in_milliseconds: i64
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub token: String,

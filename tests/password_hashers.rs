@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod password_hashers {
     use std::path::Path;
-    use cas_lib::{password_hashers::{argon2::CASArgon, bcrypt::CASBCrypt, cas_password_hasher::CASPasswordHasher, scrypt::CASScrypt}, symmetric::{aes::{CASAES128, CASAES256}, cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption}}};
+    use cas_lib::{password_hashers::{argon2::CASArgon, bcrypt::CASBCrypt, scrypt::CASScrypt}, symmetric::{aes::{CASAES128, CASAES256}, cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption}}};
     
     #[test]
     pub fn argon2_hash_with_parameters() {
@@ -50,6 +50,14 @@ mod password_hashers {
         let password = "DoNotUseThisPassword".to_string();
         let hash = CASScrypt::hash_password(password.clone());
         let verification = CASScrypt::verify_password(hash, password);
+        assert_eq!(true, verification);
+    }
+
+    #[test]
+    pub fn scrypt_hash_password_customized() {
+        let password = "DoNotUseThisPassword".to_string();
+        let hash = CASScrypt::hash_password_customized(password.clone(), 17, 8, 1);
+        let verification = CASScrypt::verify_password(hash, password);  
         assert_eq!(true, verification);
     }
 
