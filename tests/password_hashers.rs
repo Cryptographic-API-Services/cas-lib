@@ -69,5 +69,11 @@ mod password_hashers {
         assert_eq!(true, verification);
     }
 
-
+    #[test]
+    pub fn bcrypt_hash_password_customized() {
+        let password = "DoNotUseThisPassword".to_string();
+        let hash = CASBCrypt::hash_password_customized(password.clone(), 12);
+        let verification = CASBCrypt::verify_password(hash, password);
+        assert_eq!(true, verification);
+    }
 }
