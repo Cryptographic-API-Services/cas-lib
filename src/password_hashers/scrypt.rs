@@ -4,17 +4,22 @@
 
 use scrypt::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Scrypt,
+    Scrypt, Params
 };
-
-use super::cas_password_hasher::CASPasswordHasher;
 
 pub struct CASScrypt;
 
-impl CASPasswordHasher for CASScrypt {
+impl CASScrypt {
+    /// Hashes a passwith using Scrypt with custom params.
+    pub fn hash_password_customized(password_to_hash: String, cpu_memory_cost: u8, block_size: u32, parallelism: u32) -> String {
+        let salt = SaltString::generate(&mut OsRng);
+        let params = Params::new(cpu_memory_cost, block_size, parallelism, 32).unwrap();
+        return Scrypt.hash_password_customized(password_to_hash.as_bytes(), None, None, params, &salt).unwrap().to_string();
+    }
+
     /// Hashes a password using Scrypt.
     /// Returns the hashed password as a string.
-    fn hash_password(password_to_hash: String) -> String {
+    pub fn hash_password(password_to_hash: String) -> String {
         let salt = SaltString::generate(&mut OsRng);
         return Scrypt
             .hash_password(password_to_hash.as_bytes(), &salt)
@@ -24,7 +29,7 @@ impl CASPasswordHasher for CASScrypt {
 
     /// Verifies a password against a hashed password using Scrypt.
     /// Returns true if the password matches the hashed password, false otherwise.
-    fn verify_password(hashed_password: String, password_to_verify: String) -> bool {
+    pub fn verify_password(hashed_password: String, password_to_verify: String) -> bool {
         let parsed_hash = PasswordHash::new(&hashed_password).unwrap();
         return Scrypt
             .verify_password(password_to_verify.as_bytes(), &parsed_hash)
