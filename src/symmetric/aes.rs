@@ -2,7 +2,6 @@ use aes_gcm::{AeadCore, Key};
 
 use hkdf::Hkdf;
 use rand::rngs::OsRng;
-use rand::RngCore;
 
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead},
