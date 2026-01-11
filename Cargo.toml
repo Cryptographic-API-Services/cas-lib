@@ -1,6 +1,6 @@
 [package]
 name = "cas-lib"
-version = "0.2.70"
+version = "0.2.71"
 edition = "2021"
 description = "A function wrapper layer for RustCrypto and Dalek-Cryptography. Intended to be used in FFI situations with a global heap deallactor at the top level project."
 license = "Apache-2.0"
@@ -22,7 +22,7 @@ rsa = "0.9.6"
 scrypt = "0.11.0"
 sha3 = "0.10.8"
 x25519-dalek = {version = "2.0.0", features = ["static_secrets"]}
-ascon-aead = "0.5.1"
+ascon-aead = {version = "0.6.0-pre.2"}
 hmac = "0.12.1"
 sha2 = "0.10.8"
 zstd = "0.13"
