@@ -1,10 +1,10 @@
-use aes_gcm::{AeadCore, Key};
+use aes_gcm::{Key, aes::cipher::crypto_common::Generate};
 
 use hkdf::Hkdf;
-use rand::rngs::OsRng;
+use rand::{RngCore, rngs::OsRng};
 
 use aes_gcm::{
-    aead::{generic_array::GenericArray, Aead},
+    aead::{Aead},
     Aes128Gcm, Aes256Gcm, KeyInit, Nonce,
 };
 use sha2::Sha256;
@@ -17,32 +17,32 @@ impl CASAES256Encryption for CASAES256 {
 
     /// Generates an AES256 key from a vector
     fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8> {
-        let result = Key::<Aes256Gcm>::from_slice(&key_slice).to_vec();
+        let result = Key::<Aes256Gcm>::try_from(key_slice.as_slice()).unwrap().to_vec();
         result
     }
 
     /// Generates an AES 256 32-bit Key
     fn generate_key() -> Vec<u8> {
-        return Aes256Gcm::generate_key(&mut OsRng).to_vec();
+        return Key::<Aes256Gcm>::generate().to_vec();
     }
 
 
     /// Encrypts with AES-256-GCM taking an aes_key and aes_nonce
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
-        let key = GenericArray::from_slice(&aes_key);
+        let key = Key::<Aes256Gcm>::try_from(aes_key.as_slice()).unwrap();
         let cipher = Aes256Gcm::new(&key);
-        let nonce = Nonce::from_slice(&nonce);
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
+        let nonce = Nonce::try_from(nonce.as_slice()).unwrap();
+        let ciphertext = cipher.encrypt(&nonce, plaintext.as_ref()).unwrap();
         ciphertext
     }
 
 
     /// Decrypts with AES-256-GCM taking an aes_key and aes_nonce
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
-        let key = GenericArray::from_slice(&aes_key);
+        let key = Key::<Aes256Gcm>::try_from(aes_key.as_slice()).unwrap();
         let cipher = Aes256Gcm::new(&key);
-        let nonce = Nonce::from_slice(&nonce);
-        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).unwrap();
+        let nonce = Nonce::try_from(nonce.as_slice()).unwrap();
+        let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
         plaintext
     }
 
@@ -57,8 +57,10 @@ impl CASAES256Encryption for CASAES256 {
     
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut rng = OsRng;
-        Aes256Gcm::generate_nonce(&mut rng).to_vec()
+        let mut os_rng = OsRng;
+        let mut nonce = [0u8; 12];
+        os_rng.fill_bytes(&mut nonce);
+        nonce.to_vec()      
     }
 }
 
@@ -66,25 +68,23 @@ impl CASAES128Encryption for CASAES128 {
 
     /// Generates an AES128 key from a vector
     fn key_from_vec(key_slice: Vec<u8>) -> Vec<u8> {
-        let result = Key::<Aes128Gcm>::from_slice(&key_slice).to_vec();
+        let result = Key::<Aes128Gcm>::try_from(key_slice.as_slice()).unwrap().to_vec();
         result
     }
 
-    
-
     /// Generates an AES-128 16-byte key
     fn generate_key() -> Vec<u8> {
-        return Aes128Gcm::generate_key(&mut OsRng).to_vec();
+        return Key::<Aes128Gcm>::generate().to_vec();
     }
 
     
 
     /// Encrypts with AES-128-GCM taking an aes_key and aes_nonce
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> Vec<u8> {
-        let key = GenericArray::from_slice(&aes_key);
+        let key = Key::<Aes128Gcm>::try_from(aes_key.as_slice()).unwrap();
         let cipher = Aes128Gcm::new(&key);
-        let nonce = Nonce::from_slice(&nonce);
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap().into();
+        let nonce = Nonce::try_from(nonce.as_slice()).unwrap();
+        let ciphertext = cipher.encrypt(&nonce, plaintext.as_ref()).unwrap().into();
         ciphertext
     }
 
@@ -92,10 +92,10 @@ impl CASAES128Encryption for CASAES128 {
 
     /// Decrypts with AES-128-GCM taking an aes_key and aes_nonce
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> Vec<u8> {
-        let key = GenericArray::from_slice(&aes_key);
+        let key = Key::<Aes128Gcm>::try_from(aes_key.as_slice()).unwrap();
         let cipher = Aes128Gcm::new(&key);
-        let nonce = Nonce::from_slice(&nonce);
-        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).unwrap();
+        let nonce = Nonce::try_from(nonce.as_slice()).unwrap();
+        let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
         plaintext
     }
 
@@ -113,8 +113,10 @@ impl CASAES128Encryption for CASAES128 {
     
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut rng = OsRng;
-        Aes128Gcm::generate_nonce(&mut rng).to_vec()
+        let mut os_rng = OsRng;
+        let mut nonce = [0u8; 12];
+        os_rng.fill_bytes(&mut nonce);
+        nonce.to_vec()
     }
 
     

@@ -1,6 +1,6 @@
 [package]
 name = "cas-lib"
-version = "0.2.71"
+version = "0.2.72"
 edition = "2021"
 description = "A function wrapper layer for RustCrypto and Dalek-Cryptography. Intended to be used in FFI situations with a global heap deallactor at the top level project."
 license = "Apache-2.0"
@@ -12,7 +12,7 @@ crate-type = ["lib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aes-gcm = "0.10.3"
+aes-gcm = {version = "0.11.0-rc.2"}
 argon2 = "0.5.2"
 bcrypt = "0.15.0"
 blake2 = "0.10.6"
@@ -31,7 +31,7 @@ uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 hkdf = "0.12.4"
-chacha20poly1305 = "0.10.1"
+chacha20poly1305 = { version = "0.11.0-rc.2" }
 slh-dsa = "0.0.3"  
 ml-kem = "0.2.1"
 reqwest = { version = "0.12.24", features = ["json", "cookies", "rustls-tls"] }
