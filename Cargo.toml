@@ -1,6 +1,6 @@
 [package]
 name = "cas-lib"
-version = "0.2.72"
+version = "0.2.73"
 edition = "2021"
 description = "A function wrapper layer for RustCrypto and Dalek-Cryptography. Intended to be used in FFI situations with a global heap deallactor at the top level project."
 license = "Apache-2.0"
@@ -12,9 +12,9 @@ crate-type = ["lib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aes-gcm = {version = "0.11.0-rc.2"}
+aes-gcm = "0.10.3"
 argon2 = "0.5.2"
-bcrypt = "0.15.0"
+bcrypt = "0.18.0"
 blake2 = "0.10.6"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
@@ -22,7 +22,7 @@ rsa = "0.9.6"
 scrypt = "0.11.0"
 sha3 = "0.10.8"
 x25519-dalek = {version = "2.0.0", features = ["static_secrets"]}
-ascon-aead = {version = "0.6.0-pre.2"}
+ascon-aead = "0.5.2"
 hmac = "0.12.1"
 sha2 = "0.10.8"
 zstd = "0.13"
@@ -31,10 +31,10 @@ uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 hkdf = "0.12.4"
-chacha20poly1305 = { version = "0.11.0-rc.2" }
+chacha20poly1305 = "0.10.1"
 slh-dsa = "0.0.3"  
 ml-kem = "0.2.1"
-reqwest = { version = "0.12.24", features = ["json", "cookies", "rustls-tls"] }
+reqwest = { version = "0.12.24", default-features = false, features = ["json", "cookies", "rustls-tls"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
 url = "2.5.7"

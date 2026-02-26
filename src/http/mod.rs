@@ -88,7 +88,7 @@ pub async fn send_benchmark(time_in_milliseconds: i64, class_name: String, metho
     let base_url = BASE_URL.lock().unwrap().clone();
     let client = BENCHMARK_SENDER_CLIENT.lock().unwrap().as_ref().unwrap().clone();
     
-    let response = client
+    let _response = client
         .post(format!("{}/{}/Benchmark", base_url, determine_api_route()))
         .json(&payload)
         .send()
