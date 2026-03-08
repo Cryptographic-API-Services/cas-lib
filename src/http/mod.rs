@@ -1,6 +1,8 @@
-use reqwest::{Client, cookie::Jar};
 use std::sync::{Arc, Mutex};
 use url::Url;
+
+#[cfg(not(target_arch = "wasm32"))]
+use reqwest::{Client, cookie::Jar};
 
 pub mod types;
 use crate::http::types::{BenchmarkRequest};
@@ -10,8 +12,11 @@ static BASE_URL: Mutex<String> = Mutex::new(String::new());
 
 static TOKEN: Mutex<String> = Mutex::new(String::new());
 static REFRESH_TOKEN: Mutex<String> = Mutex::new(String::new());
+
+#[cfg(not(target_arch = "wasm32"))]
 static BENCHMARK_SENDER_CLIENT: Mutex<Option<Client>> = Mutex::new(None);
 
+#[cfg(not(target_arch = "wasm32"))]
 fn create_benchmark_sender_client(token: String, refresh_token: String) -> Client {
     let cookie_store = Arc::new(Jar::default());
     let base_url = Url::parse(BASE_URL.lock().unwrap().as_str()).unwrap();
@@ -23,6 +28,7 @@ fn create_benchmark_sender_client(token: String, refresh_token: String) -> Clien
         .unwrap()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn determine_api_route() -> String {
     let base_url = BASE_URL.lock().unwrap();
     if base_url.contains("cryptographicapiservices.com") {
@@ -32,17 +38,20 @@ fn determine_api_route() -> String {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn set_api_key_in_cache(api_key: String) {
     let mut key = API_KEY.lock().unwrap();
     *key = api_key.clone();
     set_tokens_in_cache(api_key).await;
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn set_base_url_in_cache(base_url: String) {
     let mut url = BASE_URL.lock().unwrap();
     *url = base_url
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn set_tokens_in_cache(api_key: String) {
     let client = Client::new();
     let base_url = BASE_URL.lock().unwrap().clone();
@@ -79,6 +88,7 @@ pub async fn set_tokens_in_cache(api_key: String) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn send_benchmark(time_in_milliseconds: i64, class_name: String, method_name: String) {
     let payload = BenchmarkRequest {
         class_name,
