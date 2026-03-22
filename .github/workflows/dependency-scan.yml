@@ -1,4 +1,4 @@
-name: Dependency Scan
+name: OWASP Dependency Scan
 
 on:
   pull_request:
@@ -15,45 +15,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Generate lockfile when missing
-      run: |
-        if [ ! -f Cargo.lock ]; then
-          cargo generate-lockfile
-        fi
+      - name: Generate lockfile when missing
+        run: |
+          if [ ! -f Cargo.lock ]; then
+            cargo generate-lockfile
+          fi
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "20"
+      - name: Build the project
+        run: cargo build --release --verbose
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
-    - name: Install OWASP scanning tools
-      run: |
-        npm install -g @cyclonedx/cdxgen
-        python -m pip install --upgrade pip
-        pip install owasp-depscan
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Create reports directory
-      run: mkdir -p reports
+      - name: Install OWASP scanning tools
+        run: |
+          npm install -g @cyclonedx/cdxgen
+          python -m pip install --upgrade pip
+          pip install owasp-depscan
 
-    - name: Generate CycloneDX SBOM
-      run: cdxgen -t rust -o reports/sbom.json .
+      - name: Create reports directory
+        run: mkdir -p reports
 
-    - name: Run OWASP dep-scan
-      run: depscan --bom reports/sbom.json --reports-dir reports
+      - name: Generate CycloneDX SBOM
+        run: cdxgen -t rust -o reports/sbom.json .
 
-    - name: Upload dependency scan reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: dependency-scan-reports
-        path: reports/
+      - name: Run OWASP dep-scan
+        run: depscan --bom reports/sbom.json --reports-dir reports
+
+      - name: Upload dependency scan reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-scan-reports
+          path: reports/
