@@ -1,54 +1,62 @@
-name: OWASP Dependency Check
+name: Dependency Scan
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-scan:
+  depscan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build the project
+        run: cargo build --release --verbose
+
+      - name: Generate lockfile when missing
+        run: |
+          if [ ! -f Cargo.lock ]; then
+            cargo generate-lockfile
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          submodules: recursive
+          node-version: "24"
 
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
+          python-version: "3.11"
 
-      - name: Restore
-        run: cargo fetch
+      - name: Install OWASP scanning tools
+        run: |
+          npm install -g @cyclonedx/cdxgen
+          python -m pip install --upgrade pip
+          pip install owasp-depscan
 
-      - name: Build
-        run: cargo build --release --locked
+      - name: Create reports directory
+        run: mkdir -p reports
 
-      - name: Cache Dependency-Check data
-        uses: actions/cache@v4
-        with:
-          path: ~/.dependency-check
-          key: dependency-check-${{ runner.os }}
-          restore-keys: |
-            dependency-check-
+      - name: Generate CycloneDX SBOM
+        run: cdxgen -t rust -o reports/sbom.json .
 
-      - name: OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: cas-lib
-          path: .
-          format: HTML
-          out: dependency-check-report
-          args: >
-            --enableRetired
+      - name: Run OWASP dep-scan
+        run: depscan --bom reports/sbom.json --reports-dir reports
 
-      - name: Upload Dependency Check Report
+      - name: Upload dependency scan reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: dependency-check-report
-          path: dependency-check-report
+          name: dependency-scan-reports
+          path: reports/
