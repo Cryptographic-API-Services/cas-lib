@@ -9,6 +9,189 @@ mod symmetric {
     use sha2::Sha256;
 
     use super::*;
+
+    #[derive(Debug)]
+    struct AesGcmRspCase {
+        key: Vec<u8>,
+        iv: Vec<u8>,
+        pt: Vec<u8>,
+        ct: Vec<u8>,
+        tag: Vec<u8>,
+    }
+
+    fn decode_hex(hex: &str) -> Vec<u8> {
+        assert_eq!(hex.len() % 2, 0, "hex input must have an even length");
+
+        hex.as_bytes()
+            .chunks(2)
+            .map(|chunk| {
+                let byte = std::str::from_utf8(chunk).unwrap();
+                u8::from_str_radix(byte, 16).unwrap()
+            })
+            .collect()
+    }
+
+    fn parse_value(line: &str, prefix: &str) -> Option<String> {
+        line.strip_prefix(prefix).map(|value| value.trim().to_string())
+    }
+
+    fn parse_gcm_encryptable_rsp_cases(path: &str) -> Vec<AesGcmRspCase> {
+        let contents = std::fs::read_to_string(path).unwrap();
+        let mut cases = Vec::new();
+
+        let mut key: Option<String> = None;
+        let mut iv: Option<String> = None;
+        let mut aad: Option<String> = None;
+        let mut pt: Option<String> = None;
+        let mut ct: Option<String> = None;
+        let mut tag: Option<String> = None;
+        let mut failed = false;
+
+        let flush_case = |cases: &mut Vec<AesGcmRspCase>,
+                          key: &mut Option<String>,
+                          iv: &mut Option<String>,
+                          aad: &mut Option<String>,
+                          pt: &mut Option<String>,
+                          ct: &mut Option<String>,
+                          tag: &mut Option<String>,
+                          failed: &mut bool| {
+            if key.is_none() {
+                return;
+            }
+
+            let key_hex = key.take();
+            let iv_hex = iv.take();
+            let pt_hex = pt.take();
+            let ct_hex = ct.take();
+            let tag_hex = tag.take();
+            let aad_hex = aad.take();
+
+            let is_supported_case = !*failed
+                && aad_hex.as_deref().unwrap_or("").is_empty()
+                && iv_hex.as_deref().is_some_and(|value| value.len() == 24)
+                && tag_hex.as_deref().is_some_and(|value| value.len() == 32)
+                && key_hex.is_some()
+                && pt_hex.is_some()
+                && ct_hex.is_some();
+
+            if is_supported_case {
+                cases.push(AesGcmRspCase {
+                    key: decode_hex(key_hex.unwrap().as_str()),
+                    iv: decode_hex(iv_hex.unwrap().as_str()),
+                    pt: decode_hex(pt_hex.unwrap().as_str()),
+                    ct: decode_hex(ct_hex.unwrap().as_str()),
+                    tag: decode_hex(tag_hex.unwrap().as_str()),
+                });
+            }
+            *failed = false;
+        };
+
+        for raw_line in contents.lines() {
+            let line = raw_line.trim();
+
+            if line.starts_with("Count = ") {
+                flush_case(
+                    &mut cases,
+                    &mut key,
+                    &mut iv,
+                    &mut aad,
+                    &mut pt,
+                    &mut ct,
+                    &mut tag,
+                    &mut failed,
+                );
+                continue;
+            }
+
+            if line.is_empty() || line.starts_with('#') || line.starts_with('[') {
+                continue;
+            }
+
+            if line == "FAIL" {
+                failed = true;
+                continue;
+            }
+
+            if let Some(value) = parse_value(line, "Key = ") {
+                key = Some(value);
+                continue;
+            }
+
+            if let Some(value) = parse_value(line, "IV = ") {
+                iv = Some(value);
+                continue;
+            }
+
+            if let Some(value) = parse_value(line, "AAD = ") {
+                aad = Some(value);
+                continue;
+            }
+
+            if let Some(value) = parse_value(line, "PT = ") {
+                pt = Some(value);
+                continue;
+            }
+
+            if let Some(value) = parse_value(line, "CT = ") {
+                ct = Some(value);
+                continue;
+            }
+
+            if let Some(value) = parse_value(line, "Tag = ") {
+                tag = Some(value);
+            }
+        }
+
+        flush_case(
+            &mut cases,
+            &mut key,
+            &mut iv,
+            &mut aad,
+            &mut pt,
+            &mut ct,
+            &mut tag,
+            &mut failed,
+        );
+
+        cases
+    }
+
+    fn assert_aes_128_gcm_rsp_encrypt_vectors(path: &str) {
+        let cases = parse_gcm_encryptable_rsp_cases(path);
+        assert!(!cases.is_empty(), "no AES-128-GCM vectors were loaded from {path}");
+
+        for case in cases {
+            let mut expected = case.ct.clone();
+            expected.extend_from_slice(&case.tag);
+
+            let encrypted = <CASAES128 as CASAES128Encryption>::encrypt_plaintext(
+                case.key.clone(),
+                case.iv.clone(),
+                case.pt.clone(),
+            );
+
+            assert_eq!(encrypted, expected);
+        }
+    }
+
+    fn assert_aes_256_gcm_rsp_encrypt_vectors(path: &str) {
+        let cases = parse_gcm_encryptable_rsp_cases(path);
+        assert!(!cases.is_empty(), "no AES-256-GCM vectors were loaded from {path}");
+
+        for case in cases {
+            let mut expected = case.ct.clone();
+            expected.extend_from_slice(&case.tag);
+
+            let encrypted = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(
+                case.key.clone(),
+                case.iv.clone(),
+                case.pt.clone(),
+            );
+
+            assert_eq!(encrypted, expected);
+        }
+    }
+
     #[test]
     fn test_aes_256() {
         let path = Path::new("tests/test.docx");
@@ -132,5 +315,15 @@ mod symmetric {
         let mut file =  File::create("decrypted.docx").unwrap();
         file.write_all(&decrypted_bytes).unwrap();
         assert_eq!(file_bytes, decrypted_bytes);
+    }
+
+    #[test]
+    fn test_aes_128_gcm_rsp_encrypt_vectors() {
+        assert_aes_128_gcm_rsp_encrypt_vectors("tests/data/aes/gcmDecrypt128.rsp");
+    }
+
+    #[test]
+    fn test_aes_256_gcm_rsp_encrypt_vectors() {
+        assert_aes_256_gcm_rsp_encrypt_vectors("tests/data/aes/gcmDecrypt256.rsp");
     }
 }

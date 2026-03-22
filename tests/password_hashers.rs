@@ -76,7 +76,4 @@ mod password_hashers {
         let verification = CASBCrypt::verify_password(hash, password);
         assert_eq!(true, verification);
     }
-
-    #[test]
-    pub fn pbkdf2_
 }
