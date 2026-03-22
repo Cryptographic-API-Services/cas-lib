@@ -28,12 +28,6 @@ pub mod asymmetric {
     pub mod types;
 }
 
-pub mod digital_signature {
-    pub mod cas_digital_signature_rsa;
-    pub mod sha_512_rsa;
-    pub mod sha_256_rsa;
-}
-
 pub mod sponges {
     pub mod cas_ascon_aead;
     pub mod ascon_aead;
