@@ -63,5 +63,3 @@ pub mod pqc {
     pub mod cas_pqc;
     pub mod slh_dsa;
 }
-
-pub mod http;
