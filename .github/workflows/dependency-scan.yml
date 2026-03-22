@@ -1,4 +1,4 @@
-name: Dependency Scan
+name: OWASP Dependency Scan
 
 on:
   pull_request:
@@ -20,14 +20,14 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build the project
-        run: cargo build --release --verbose
-
       - name: Generate lockfile when missing
         run: |
           if [ ! -f Cargo.lock ]; then
             cargo generate-lockfile
           fi
+
+      - name: Build the project
+        run: cargo build --release --verbose
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
