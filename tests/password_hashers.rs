@@ -112,6 +112,8 @@ mod password_hashers {
         };
     }
 
+    // Borrowed from RustCrypto's pbkdf2 crate tests, which in turn are based on the test vectors from RFC 6070.
+    // https://www.rfc-editor.org/rfc/rfc6070
     #[test]
     pub fn pbkdf2_sha3_rfc6070_style_vectors() {
         pbkdf2_vectors!(
