@@ -17,8 +17,8 @@ mod pqc {
         let hash = <CASSHA as CASHasher>::hash_512(to_hash.clone());
 
         let keys = generate_signing_and_verification_key();
-        let signature = sign_message(hash.clone(), keys.signing_key);
-        let is_valid = verify_signature(hash, signature, keys.verification_key);
+        let signature = sign_message(hash.clone(), keys.signing_key).unwrap();
+        let is_valid = verify_signature(hash, signature, keys.verification_key).unwrap();
         assert_eq!(true, is_valid);
     }
 
@@ -28,8 +28,8 @@ mod pqc {
         let hash = <CASSHA as CASHasher>::hash_512(to_hash.clone());
 
         let keys = generate_signing_and_verification_key();
-        let signature = sign_message(hash, keys.signing_key);
-        let is_valid = verify_signature(to_hash, signature, keys.verification_key);
+        let signature = sign_message(hash, keys.signing_key).unwrap();
+        let is_valid = verify_signature(to_hash, signature, keys.verification_key).unwrap();
         assert_eq!(false, is_valid);
     }
 }

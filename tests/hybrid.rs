@@ -19,7 +19,7 @@ mod hybrid {
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
         let (_private_key, public_key, info_str) = CASHPKE::generate_key_pair();
-        let (encapped_key, ciphertext, tag) = CASHPKE::encrypt(file_bytes.clone(), public_key, info_str);
+        let (encapped_key, ciphertext, tag) = CASHPKE::encrypt(file_bytes.clone(), public_key, info_str).unwrap();
         assert!(!encapped_key.is_empty());
         assert!(!ciphertext.is_empty());
         assert!(!tag.is_empty());
@@ -31,8 +31,8 @@ mod hybrid {
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
         let (private_key, public_key, info_str) = CASHPKE::generate_key_pair();
-        let (encapped_key, ciphertext, tag) = CASHPKE::encrypt(file_bytes.clone(), public_key, info_str.clone());
-        let decrypted_bytes = CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info_str);
+        let (encapped_key, ciphertext, tag) = CASHPKE::encrypt(file_bytes.clone(), public_key, info_str.clone()).unwrap();
+        let decrypted_bytes = CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info_str).unwrap();
         assert_eq!(file_bytes, decrypted_bytes);
     }
 }

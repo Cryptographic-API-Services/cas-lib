@@ -12,74 +12,74 @@ mod password_hashers {
     #[test]
     pub fn argon2_hash_with_parameters() {
         let password = "BadPassword".to_string();
-        let hash = CASArgon::hash_password_parameters(1024, 5, 5, password.clone());
-        let verification = CASArgon::verify_password(hash, password);
+        let hash = CASArgon::hash_password_parameters(1024, 5, 5, password.clone()).unwrap();
+        let verification = CASArgon::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
     }
 
     #[test]
     pub fn argon2_derive_aes_128_and_encrypt() {
         let password = b"BadPassword".to_vec(); // do not use this as a password.
-        let key = CASArgon::derive_aes_128_key(password);
+        let key = CASArgon::derive_aes_128_key(password).unwrap();
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES128::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone());
-        let decrypted = CASAES128::decrypt_ciphertext(key, nonce, encrypted);
+        let encrypted = CASAES128::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone()).unwrap();
+        let decrypted = CASAES128::decrypt_ciphertext(key, nonce, encrypted).unwrap();
         assert_eq!(file_bytes, decrypted);
     }
 
     #[test]
     pub fn argon2_derive_aes_256_and_encrypt() {
         let password = b"BadPassword".to_vec(); // do not use this as a password.
-        let key = CASArgon::derive_aes_256_key(password);
+        let key = CASArgon::derive_aes_256_key(password).unwrap();
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
-        let encrypted = CASAES256::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone());
-        let decrypted = CASAES256::decrypt_ciphertext(key, nonce, encrypted);
+        let encrypted = CASAES256::encrypt_plaintext(key.clone(), nonce.clone(), file_bytes.clone()).unwrap();
+        let decrypted = CASAES256::decrypt_ciphertext(key, nonce, encrypted).unwrap();
         assert_eq!(file_bytes, decrypted);
     }
 
     #[test]
     pub fn argon2_hash_password() {
         let password = "BadPassword".to_string();
-        let hash = CASArgon::hash_password(password.clone());
-        let verification = CASArgon::verify_password(hash, password);
+        let hash = CASArgon::hash_password(password.clone()).unwrap();
+        let verification = CASArgon::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
     }
 
     #[test]
     pub fn scrypt_hash_password() {
         let password = "DoNotUseThisPassword".to_string();
-        let hash = CASScrypt::hash_password(password.clone());
-        let verification = CASScrypt::verify_password(hash, password);
+        let hash = CASScrypt::hash_password(password.clone()).unwrap();
+        let verification = CASScrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
     }
 
     #[test]
     pub fn scrypt_hash_password_customized() {
         let password = "DoNotUseThisPassword".to_string();
-        let hash = CASScrypt::hash_password_customized(password.clone(), 17, 8, 1);
-        let verification = CASScrypt::verify_password(hash, password);  
+        let hash = CASScrypt::hash_password_customized(password.clone(), 17, 8, 1).unwrap();
+        let verification = CASScrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
     }
 
     #[test]
     pub fn bcrypt_hash_password() {
         let password = "DoNotUseThisPassword".to_string();
-        let hash = CASBCrypt::hash_password(password.clone());
-        let verification = CASBCrypt::verify_password(hash, password);
+        let hash = CASBCrypt::hash_password(password.clone()).unwrap();
+        let verification = CASBCrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
     }
 
     #[test]
     pub fn bcrypt_hash_password_customized() {
         let password = "DoNotUseThisPassword".to_string();
-        let hash = CASBCrypt::hash_password_customized(password.clone(), 12);
-        let verification = CASBCrypt::verify_password(hash, password);
+        let hash = CASBCrypt::hash_password_customized(password.clone(), 12).unwrap();
+        let verification = CASBCrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
     }
 
