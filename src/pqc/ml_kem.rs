@@ -2,22 +2,13 @@ use ml_kem::kem::{DecapsulationKey, EncapsulationKey, Encapsulate, Decapsulate};
 use ml_kem::*;
 use rand::rngs::OsRng;
 
+use crate::error::{CasError, CasResult};
 use crate::pqc::cas_pqc::{MlKemEncapResult, MlKemKeyPair};
 
 /// ML-KEM-1024 (Kyber-1024) byte lengths (public API sanity checks)
 const MLKEM1024_PUBLIC_KEY_LEN: usize = 1568;
 const MLKEM1024_SECRET_KEY_LEN: usize = 3168;
 const MLKEM1024_CIPHERTEXT_LEN: usize = 1568;
-
-#[derive(Debug)]
-pub enum MlKemError {
-    BadPublicKeyLength,
-    BadSecretKeyLength,
-    BadCiphertextLength,
-    DecodeFailed,
-}
-
-pub type MlKemResult<T> = Result<T, MlKemError>;
 
 /// Generate (secret/decapsulation key, public/encapsulation key)
 pub fn ml_kem_1024_generate() -> MlKemKeyPair {
@@ -30,15 +21,15 @@ pub fn ml_kem_1024_generate() -> MlKemKeyPair {
 }
 
 /// Encapsulate to a public key -> (ciphertext, shared_secret)
-pub fn ml_kem_1024_encapsulate(public_key: Vec<u8>) -> MlKemResult<MlKemEncapResult> {
+pub fn ml_kem_1024_encapsulate(public_key: Vec<u8>) -> CasResult<MlKemEncapResult> {
     if public_key.len() != MLKEM1024_PUBLIC_KEY_LEN {
-        return Err(MlKemError::BadPublicKeyLength);
+        return Err(CasError::InvalidKey);
     }
     let ek_bytes: Encoded<EncapsulationKey<MlKem1024Params>> =
-        public_key.as_slice().try_into().map_err(|_| MlKemError::DecodeFailed)?;
+        public_key.as_slice().try_into().map_err(|_| CasError::InvalidKey)?;
     let ek = EncapsulationKey::<ml_kem::MlKem1024Params>::from_bytes(&ek_bytes);
     let mut rng = OsRng;
-    let (ct, ss) = ek.encapsulate(&mut rng).map_err(|_| MlKemError::DecodeFailed)?;
+    let (ct, ss) = ek.encapsulate(&mut rng).map_err(|_| CasError::EncryptionFailed)?;
     Ok(MlKemEncapResult {
         ciphertext: ct.as_slice().to_vec(),
         shared_secret: ss.as_slice().to_vec(),
@@ -46,21 +37,21 @@ pub fn ml_kem_1024_encapsulate(public_key: Vec<u8>) -> MlKemResult<MlKemEncapRes
 }
 
 /// Decapsulate a ciphertext with the secret key -> shared_secret
-pub fn ml_kem_1024_decapsulate(secret_key: Vec<u8>, ciphertext: Vec<u8>) -> MlKemResult<Vec<u8>> {
+pub fn ml_kem_1024_decapsulate(secret_key: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>> {
     if secret_key.len() != MLKEM1024_SECRET_KEY_LEN {
-        return Err(MlKemError::BadSecretKeyLength);
+        return Err(CasError::InvalidKey);
     }
     if ciphertext.len() != MLKEM1024_CIPHERTEXT_LEN {
-        return Err(MlKemError::BadCiphertextLength);
+        return Err(CasError::InvalidInput);
     }
 
     let dk_bytes: Encoded<DecapsulationKey<MlKem1024Params>> =
-        secret_key.as_slice().try_into().map_err(|_| MlKemError::DecodeFailed)?;
+        secret_key.as_slice().try_into().map_err(|_| CasError::InvalidKey)?;
     let dk = DecapsulationKey::<MlKem1024Params>::from_bytes(&dk_bytes);
 
     let ct: Ciphertext<MlKem1024> =
-        ciphertext.as_slice().try_into().map_err(|_| MlKemError::DecodeFailed)?;
+        ciphertext.as_slice().try_into().map_err(|_| CasError::InvalidInput)?;
 
-    let ss = dk.decapsulate(&ct).map_err(|_| MlKemError::DecodeFailed)?;
+    let ss = dk.decapsulate(&ct).map_err(|_| CasError::DecryptionFailed)?;
     Ok(ss.to_vec())
 }

@@ -7,8 +7,8 @@ mod key_exchange {
         let alice: X25519SecretPublicKeyResult = X25519::generate_secret_and_public_key();
         let bob: X25519SecretPublicKeyResult = X25519::generate_secret_and_public_key();
 
-        let alice_shared_secret = X25519::diffie_hellman(alice.secret_key.clone(), bob.public_key.clone());
-        let bob_shared_secret = X25519::diffie_hellman(bob.secret_key.clone(), alice.public_key.clone());
+        let alice_shared_secret = X25519::diffie_hellman(alice.secret_key.clone(), bob.public_key.clone()).unwrap();
+        let bob_shared_secret = X25519::diffie_hellman(bob.secret_key.clone(), alice.public_key.clone()).unwrap();
         assert_eq!(alice_shared_secret, bob_shared_secret);
     }
 }

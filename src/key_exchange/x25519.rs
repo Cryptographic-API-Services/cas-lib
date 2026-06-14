@@ -3,6 +3,7 @@
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
 
+use crate::error::{CasError, CasResult};
 use super::cas_key_exchange::CASKeyExchange;
 
 pub struct X25519SecretPublicKeyResult {
@@ -26,17 +27,17 @@ impl CASKeyExchange for X25519 {
     }
 
     /// Performs a Diffie-Hellman key exchange using the provided secret key and user's public key.
-    /// Returns the shared secret as a vector of bytes.
-    /// The shared secret is computed as the Diffie-Hellman result of the secret key and the user's public key.
+    /// Returns the shared secret as a vector of bytes, or an error if either input
+    /// is not 32 bytes long.
     /// The secret key and user's public key are expected to be in byte array format.
-    fn diffie_hellman(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> Vec<u8> {
-        let mut secret_key_box = Box::new([0u8; 32]);
-        secret_key_box.copy_from_slice(&my_secret_key);
-        let mut users_public_key_box = Box::new([0u8; 32]);
-        users_public_key_box.copy_from_slice(&users_public_key);
+    fn diffie_hellman(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> CasResult<Vec<u8>> {
+        let secret_key_bytes: [u8; 32] =
+            my_secret_key.try_into().map_err(|_| CasError::InvalidKey)?;
+        let public_key_bytes: [u8; 32] =
+            users_public_key.try_into().map_err(|_| CasError::InvalidKey)?;
 
-        let secret_key = StaticSecret::from(*secret_key_box);
-        let public_key = PublicKey::from(*users_public_key_box);
-        return secret_key.diffie_hellman(&public_key).as_bytes().to_vec();
+        let secret_key = StaticSecret::from(secret_key_bytes);
+        let public_key = PublicKey::from(public_key_bytes);
+        Ok(secret_key.diffie_hellman(&public_key).as_bytes().to_vec())
     }
 }
