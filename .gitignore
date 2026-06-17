@@ -13,5 +13,3 @@ target/
 # Added by cargo
 
 /target
-decrypted.docx
-encrypted.docx
