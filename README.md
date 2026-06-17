@@ -26,7 +26,7 @@ CAS Rust Core Library (`cas-lib`) is a unified cryptographic abstraction layer f
 
 ## Usage Examples
 
-See practical usage and code samples in our [Examples](./docs/EXAMPLES.md).
+See practical usage and code samples in our [Examples](https://github.com/Cryptographic-API-Services/cas-lib/blob/main/docs/EXAMPLES.md).
 
 ## Supported Platforms
 
