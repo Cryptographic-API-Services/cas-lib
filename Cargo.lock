@@ -158,7 +158,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cas-lib"
-version = "0.2.81"
+version = "0.2.82"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -171,7 +171,6 @@ dependencies = [
  "hmac",
  "hpke",
  "ml-kem",
- "napi-build",
  "pbkdf2",
  "rand",
  "rsa",
@@ -680,12 +679,6 @@ dependencies = [
  "rand_core",
  "sha3",
 ]
-
-[[package]]
-name = "napi-build"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebd4419172727423cf30351406c54f6cc1b354a2cfb4f1dba3e6cd07f6d5522b"
 
 [[package]]
 name = "num-bigint-dig"
