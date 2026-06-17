@@ -16,5 +16,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --release --verbose
+    - name: Test
+      run: cargo test --release --verbose
     - name: Publish
       run: cargo publish --token ${{ secrets.TOKEN }}
