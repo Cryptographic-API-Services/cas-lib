@@ -35,7 +35,7 @@ See practical usage and code samples in our [Examples](https://github.com/Crypto
 
 ## Disclaimer
 
-This library leverages several cryptographic crates via our core FFI [layer](./src). Many of these crates have not undergone formal security audits. Use this library at your own risk and always review the underlying cryptographic implementations for your security requirements.
+This library leverages several cryptographic crates via our core FFI [layer](https://github.com/Cryptographic-API-Services/cas-lib/tree/main/src). Many of these crates have not undergone formal security audits. Use this library at your own risk and always review the underlying cryptographic implementations for your security requirements.
 
 ---
 
