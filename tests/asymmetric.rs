@@ -17,7 +17,7 @@ mod asymmetric {
 
     #[test]
     pub fn signature() {
-        let key_pair: RSAKeyPairResult = CASRSA::generate_rsa_keys(2048).unwrap();
+        let key_pair: RSAKeyPairResult = CASRSA::generate_rsa_keys(3072).unwrap();
         let document = b"Hello, world!".to_vec();
         let signature = CASRSA::sign(key_pair.private_key, document.clone()).unwrap();
         assert!(document != signature, "Signature should not be the same as the document");
@@ -25,7 +25,7 @@ mod asymmetric {
 
     #[test]
     pub fn verification() {
-        let key_pair: RSAKeyPairResult = CASRSA::generate_rsa_keys(2048).unwrap();
+        let key_pair: RSAKeyPairResult = CASRSA::generate_rsa_keys(4096).unwrap();
         let document = b"Hello, world!".to_vec();
         let signature = CASRSA::sign(key_pair.private_key.clone(), document.clone()).unwrap();
         let verification = CASRSA::verify(key_pair.public_key, document, signature).unwrap();

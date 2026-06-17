@@ -24,6 +24,9 @@ impl CASRSAEncryption for CASRSA {
         if key_size < MIN_RSA_KEY_SIZE {
             return Err(CasError::InvalidParameters);
         }
+        if key_size != 2048 && key_size != 3072 && key_size != 4096 {
+            return Err(CasError::InvalidParameters);
+        }
         let mut rng: OsRng = OsRng;
         let private_key: RsaPrivateKey =
             RsaPrivateKey::new(&mut rng, key_size).map_err(|_| CasError::KeyGenerationFailed)?;
