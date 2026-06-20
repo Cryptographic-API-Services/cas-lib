@@ -69,7 +69,7 @@ NIST/FIPS known-answer test vectors live in [tests/data/](tests/data/) and are c
 
 ### CI
 
-- PRs run `cargo build --release` on both Linux and Windows (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`).
+- PRs run `cargo build --release` and `cargo test --release` on Linux, Windows, and macOS (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`, `.github/workflows/macos-pr.yml`).
 - Pushes to `main` trigger an automatic `cargo publish` (`.github/workflows/publish-main.yml`).
 
 The dev profile sets `opt-level = 3` for `num-bigint-dig` (used by the RSA crate) to keep RSA key-generation fast during local development.

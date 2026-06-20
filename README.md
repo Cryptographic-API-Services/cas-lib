@@ -15,7 +15,7 @@ CAS Rust Core Library (`cas-lib`) is a unified cryptographic abstraction layer f
 - Centralized entry point for FFI bindings: C, TypeScript, Python, .NET
 - Built on top of well-established, open-source cryptography libraries
 - Thread-safe, high-performance Rust implementation
-- Cross-platform support: Windows, Linux
+- Cross-platform support: Windows, Linux, macOS
 
 ## Documentation & References
 
@@ -32,6 +32,7 @@ See practical usage and code samples in our [Examples](https://github.com/Crypto
 
 - [X] Windows x64
 - [X] Linux x64
+- [X] macOS (Apple Silicon / arm64)
 
 ## Disclaimer
 
