@@ -21,6 +21,7 @@ pub mod key_exchange {
 
 pub mod symmetric {
     pub mod aes;
+    pub mod aes_gcm_siv;
     pub mod chacha20poly1305;
     pub mod cas_symmetric_encryption;
 }
