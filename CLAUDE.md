@@ -53,7 +53,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 | `hybrid` | HPKE |
 | `sponges` | ASCON-AEAD |
 | `message` | HMAC |
-| `pqc` | ML-KEM, SLH-DSA |
+| `pqc` | ML-KEM, SLH-DSA, ML-DSA |
 | `compression` | Zstandard |
 
 ### Data Conventions
@@ -65,7 +65,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 
 ### Test Vectors
 
-NIST/FIPS known-answer test vectors live in [tests/data/](tests/data/) and are consumed by the integration tests in [tests/symmetric.rs](tests/symmetric.rs) and [tests/hashers.rs](tests/hashers.rs). When adding a new algorithm or variant, add the corresponding test vectors there.
+NIST/FIPS and Project Wycheproof known-answer test vectors live in [tests/data/](tests/data/) and are consumed by the integration tests in [tests/symmetric.rs](tests/symmetric.rs), [tests/hashers.rs](tests/hashers.rs), and [tests/pqc.rs](tests/pqc.rs). When adding a new algorithm or variant, add the corresponding test vectors there.
 
 ### CI
 

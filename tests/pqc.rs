@@ -13,7 +13,7 @@ mod pqc {
     }
 
     #[test]
-    pub fn hkdf_sha256_pass() {
+    pub fn slh_dsa_sign_verify_pass() {
         let to_hash = b"Lets HashThis".to_vec();
         let hash = <CASSHA as CASHasher>::hash_512(to_hash.clone());
 
@@ -24,7 +24,7 @@ mod pqc {
     }
 
     #[test]
-    pub fn hkdf_sha256_fail() {
+    pub fn slh_dsa_sign_verify_fail() {
         let to_hash = b"Lets HashThis".to_vec();
         let hash = <CASSHA as CASHasher>::hash_512(to_hash.clone());
 
