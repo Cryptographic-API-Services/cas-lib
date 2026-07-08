@@ -137,6 +137,46 @@ fn main() {
 }
 ```
 
+### AES GCM Mode with AAD
+
+Both AES types also implement the `CASAES256AadEncryption` / `CASAES128AadEncryption`
+traits, which take additional authenticated data (AAD). The AAD is not encrypted, but
+it is bound to the authentication tag: decryption only succeeds when the same AAD is
+supplied, so any tampering with it is detected.
+
+```rust
+use cas_lib::symmetric::{
+    aes::CASAES256,
+    cas_symmetric_encryption::{CASAES256AadEncryption, CASAES256Encryption},
+};
+
+fn main() {
+    let plaintext: Vec<u8> = std::fs::read("MikeMulchrone_Resume2024.docx").unwrap();
+    let aad = b"file-id:1234".to_vec();
+
+    let aes_nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+    let aes_key = <CASAES256 as CASAES256Encryption>::generate_key();
+    let encrypted_bytes = <CASAES256 as CASAES256AadEncryption>::encrypt_plaintext_with_aad(
+        aes_key.clone(),
+        aes_nonce.clone(),
+        plaintext.clone(),
+        aad.clone(),
+    )
+    .unwrap();
+
+    // Decryption requires the same AAD; a different AAD returns an error.
+    let decrypted_bytes = <CASAES256 as CASAES256AadEncryption>::decrypt_ciphertext_with_aad(
+        aes_key,
+        aes_nonce,
+        encrypted_bytes,
+        aad,
+    )
+    .unwrap();
+
+    assert_eq!(plaintext, decrypted_bytes);
+}
+```
+
 ### ChaCha20-Poly1305
 ```rust
 use std::{fs::File, io::Write, path::Path};
