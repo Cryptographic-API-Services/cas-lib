@@ -7,7 +7,7 @@ mod common;
 #[cfg(test)]
 mod symmetric {
     use crate::common::temp_output_path;
-    use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, pqc::{cas_pqc::MlKemKeyPair, ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate}}, symmetric::{aes::CASAES128, cas_symmetric_encryption::{CASAES128Encryption, Chacha20Poly1305Encryption}, chacha20poly1305::CASChacha20Poly1305}};
+    use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, pqc::{cas_pqc::MlKemKeyPair, ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate}}, symmetric::{aes::CASAES128, cas_symmetric_encryption::{CASAES128AadEncryption, CASAES128Encryption, CASAES256AadEncryption, Chacha20Poly1305Encryption}, chacha20poly1305::CASChacha20Poly1305}};
     use hkdf::Hkdf;
     use sha2::Sha256;
 
@@ -17,9 +17,11 @@ mod symmetric {
     struct AesGcmRspCase {
         key: Vec<u8>,
         iv: Vec<u8>,
+        aad: Vec<u8>,
         pt: Vec<u8>,
         ct: Vec<u8>,
         tag: Vec<u8>,
+        failed: bool,
     }
 
     fn decode_hex(hex: &str) -> Vec<u8> {
@@ -38,7 +40,7 @@ mod symmetric {
         line.strip_prefix(prefix).map(|value| value.trim().to_string())
     }
 
-    fn parse_gcm_encryptable_rsp_cases(path: &str) -> Vec<AesGcmRspCase> {
+    fn parse_gcm_rsp_cases(path: &str) -> Vec<AesGcmRspCase> {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut cases = Vec::new();
 
@@ -69,21 +71,21 @@ mod symmetric {
             let tag_hex = tag.take();
             let aad_hex = aad.take();
 
-            let is_supported_case = !*failed
-                && aad_hex.as_deref().unwrap_or("").is_empty()
-                && iv_hex.as_deref().is_some_and(|value| value.len() == 24)
+            let is_supported_case = iv_hex.as_deref().is_some_and(|value| value.len() == 24)
                 && tag_hex.as_deref().is_some_and(|value| value.len() == 32)
                 && key_hex.is_some()
-                && pt_hex.is_some()
-                && ct_hex.is_some();
+                && ct_hex.is_some()
+                && (pt_hex.is_some() || *failed);
 
             if is_supported_case {
                 cases.push(AesGcmRspCase {
                     key: decode_hex(key_hex.unwrap().as_str()),
                     iv: decode_hex(iv_hex.unwrap().as_str()),
-                    pt: decode_hex(pt_hex.unwrap().as_str()),
+                    aad: decode_hex(aad_hex.unwrap_or_default().as_str()),
+                    pt: decode_hex(pt_hex.unwrap_or_default().as_str()),
                     ct: decode_hex(ct_hex.unwrap().as_str()),
                     tag: decode_hex(tag_hex.unwrap().as_str()),
+                    failed: *failed,
                 });
             }
             *failed = false;
@@ -160,7 +162,10 @@ mod symmetric {
     }
 
     fn assert_aes_128_gcm_rsp_encrypt_vectors(path: &str) {
-        let cases = parse_gcm_encryptable_rsp_cases(path);
+        let cases: Vec<AesGcmRspCase> = parse_gcm_rsp_cases(path)
+            .into_iter()
+            .filter(|case| !case.failed && case.aad.is_empty())
+            .collect();
         assert!(!cases.is_empty(), "no AES-128-GCM vectors were loaded from {path}");
 
         for case in cases {
@@ -179,7 +184,10 @@ mod symmetric {
     }
 
     fn assert_aes_256_gcm_rsp_encrypt_vectors(path: &str) {
-        let cases = parse_gcm_encryptable_rsp_cases(path);
+        let cases: Vec<AesGcmRspCase> = parse_gcm_rsp_cases(path)
+            .into_iter()
+            .filter(|case| !case.failed && case.aad.is_empty())
+            .collect();
         assert!(!cases.is_empty(), "no AES-256-GCM vectors were loaded from {path}");
 
         for case in cases {
@@ -194,6 +202,106 @@ mod symmetric {
             .unwrap();
 
             assert_eq!(encrypted, expected);
+        }
+    }
+
+    fn assert_aes_128_gcm_rsp_encrypt_aad_vectors(path: &str) {
+        let cases: Vec<AesGcmRspCase> = parse_gcm_rsp_cases(path)
+            .into_iter()
+            .filter(|case| !case.failed && !case.aad.is_empty())
+            .collect();
+        assert!(!cases.is_empty(), "no AES-128-GCM AAD vectors were loaded from {path}");
+
+        for case in cases {
+            let mut expected = case.ct.clone();
+            expected.extend_from_slice(&case.tag);
+
+            let encrypted = <CASAES128 as CASAES128AadEncryption>::encrypt_plaintext_with_aad(
+                case.key.clone(),
+                case.iv.clone(),
+                case.pt.clone(),
+                case.aad.clone(),
+            )
+            .unwrap();
+
+            assert_eq!(encrypted, expected);
+        }
+    }
+
+    fn assert_aes_256_gcm_rsp_encrypt_aad_vectors(path: &str) {
+        let cases: Vec<AesGcmRspCase> = parse_gcm_rsp_cases(path)
+            .into_iter()
+            .filter(|case| !case.failed && !case.aad.is_empty())
+            .collect();
+        assert!(!cases.is_empty(), "no AES-256-GCM AAD vectors were loaded from {path}");
+
+        for case in cases {
+            let mut expected = case.ct.clone();
+            expected.extend_from_slice(&case.tag);
+
+            let encrypted = <CASAES256 as CASAES256AadEncryption>::encrypt_plaintext_with_aad(
+                case.key.clone(),
+                case.iv.clone(),
+                case.pt.clone(),
+                case.aad.clone(),
+            )
+            .unwrap();
+
+            assert_eq!(encrypted, expected);
+        }
+    }
+
+    fn assert_aes_128_gcm_rsp_decrypt_aad_vectors(path: &str) {
+        let cases = parse_gcm_rsp_cases(path);
+        assert!(!cases.is_empty(), "no AES-128-GCM vectors were loaded from {path}");
+        assert!(
+            cases.iter().any(|case| case.failed),
+            "no failing AES-128-GCM vectors were loaded from {path}"
+        );
+
+        for case in cases {
+            let mut ciphertext = case.ct.clone();
+            ciphertext.extend_from_slice(&case.tag);
+
+            let decrypted = <CASAES128 as CASAES128AadEncryption>::decrypt_ciphertext_with_aad(
+                case.key.clone(),
+                case.iv.clone(),
+                ciphertext,
+                case.aad.clone(),
+            );
+
+            if case.failed {
+                assert!(decrypted.is_err());
+            } else {
+                assert_eq!(decrypted.unwrap(), case.pt);
+            }
+        }
+    }
+
+    fn assert_aes_256_gcm_rsp_decrypt_aad_vectors(path: &str) {
+        let cases = parse_gcm_rsp_cases(path);
+        assert!(!cases.is_empty(), "no AES-256-GCM vectors were loaded from {path}");
+        assert!(
+            cases.iter().any(|case| case.failed),
+            "no failing AES-256-GCM vectors were loaded from {path}"
+        );
+
+        for case in cases {
+            let mut ciphertext = case.ct.clone();
+            ciphertext.extend_from_slice(&case.tag);
+
+            let decrypted = <CASAES256 as CASAES256AadEncryption>::decrypt_ciphertext_with_aad(
+                case.key.clone(),
+                case.iv.clone(),
+                ciphertext,
+                case.aad.clone(),
+            );
+
+            if case.failed {
+                assert!(decrypted.is_err());
+            } else {
+                assert_eq!(decrypted.unwrap(), case.pt);
+            }
         }
     }
 
@@ -330,5 +438,59 @@ mod symmetric {
     #[test]
     fn test_aes_256_gcm_rsp_encrypt_vectors() {
         assert_aes_256_gcm_rsp_encrypt_vectors("tests/data/aes/gcmDecrypt256.rsp");
+    }
+
+    #[test]
+    fn test_aes_128_gcm_rsp_encrypt_aad_vectors() {
+        assert_aes_128_gcm_rsp_encrypt_aad_vectors("tests/data/aes/gcmDecrypt128.rsp");
+    }
+
+    #[test]
+    fn test_aes_256_gcm_rsp_encrypt_aad_vectors() {
+        assert_aes_256_gcm_rsp_encrypt_aad_vectors("tests/data/aes/gcmDecrypt256.rsp");
+    }
+
+    #[test]
+    fn test_aes_128_gcm_rsp_decrypt_aad_vectors() {
+        assert_aes_128_gcm_rsp_decrypt_aad_vectors("tests/data/aes/gcmDecrypt128.rsp");
+    }
+
+    #[test]
+    fn test_aes_256_gcm_rsp_decrypt_aad_vectors() {
+        assert_aes_256_gcm_rsp_decrypt_aad_vectors("tests/data/aes/gcmDecrypt256.rsp");
+    }
+
+    #[test]
+    fn test_aes_256_aad_round_trip() {
+        let path = Path::new("tests/test.docx");
+        let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
+        let aad = b"cas-lib aes-256-gcm aad".to_vec();
+        let aes_nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+        let aes_key = <CASAES256 as CASAES256Encryption>::generate_key();
+        let encrypted_bytes = <CASAES256 as CASAES256AadEncryption>::encrypt_plaintext_with_aad(aes_key.clone(), aes_nonce.clone(), file_bytes.clone(), aad.clone()).unwrap();
+
+        let decrypted_bytes = <CASAES256 as CASAES256AadEncryption>::decrypt_ciphertext_with_aad(aes_key.clone(), aes_nonce.clone(), encrypted_bytes.clone(), aad).unwrap();
+        assert_eq!(file_bytes, decrypted_bytes);
+
+        let tampered_aad = b"tampered aad".to_vec();
+        let result = <CASAES256 as CASAES256AadEncryption>::decrypt_ciphertext_with_aad(aes_key, aes_nonce, encrypted_bytes, tampered_aad);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aes_128_aad_round_trip() {
+        let path = Path::new("tests/test.docx");
+        let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
+        let aad = b"cas-lib aes-128-gcm aad".to_vec();
+        let aes_nonce = <CASAES128 as CASAES128Encryption>::generate_nonce();
+        let aes_key = <CASAES128 as CASAES128Encryption>::generate_key();
+        let encrypted_bytes = <CASAES128 as CASAES128AadEncryption>::encrypt_plaintext_with_aad(aes_key.clone(), aes_nonce.clone(), file_bytes.clone(), aad.clone()).unwrap();
+
+        let decrypted_bytes = <CASAES128 as CASAES128AadEncryption>::decrypt_ciphertext_with_aad(aes_key.clone(), aes_nonce.clone(), encrypted_bytes.clone(), aad).unwrap();
+        assert_eq!(file_bytes, decrypted_bytes);
+
+        let tampered_aad = b"tampered aad".to_vec();
+        let result = <CASAES128 as CASAES128AadEncryption>::decrypt_ciphertext_with_aad(aes_key, aes_nonce, encrypted_bytes, tampered_aad);
+        assert!(result.is_err());
     }
 }

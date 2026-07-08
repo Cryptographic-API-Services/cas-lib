@@ -18,6 +18,16 @@ pub trait CASAES128Encryption {
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
 }
 
+pub trait CASAES256AadEncryption {
+    fn encrypt_plaintext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn decrypt_ciphertext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>>;
+}
+
+pub trait CASAES128AadEncryption {
+    fn encrypt_plaintext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn decrypt_ciphertext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>>;
+}
+
 pub trait CASAES256SIVEncryption {
     fn generate_key() -> Vec<u8>;
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
