@@ -309,22 +309,29 @@ fn main() {
 
 The message module provides HMAC. `sign` produces a tag over a message using a
 shared key; `verify` recomputes the tag and confirms it matches. A correct
-key + message + signature triple verifies as `true`.
+key + message + signature triple verifies as `true`. `HMAC` uses SHA2-256
+(32-byte tag) and `HMACSha512` uses SHA2-512 (64-byte tag); both implement
+the same `CASHMAC` trait.
 
 ```rust
-use cas_lib::message::{cas_hmac::CASHMAC, hmac::HMAC};
+use cas_lib::message::{cas_hmac::CASHMAC, hmac::{HMAC, HMACSha512}};
 
 fn main() {
     // Shared secret key and the message bytes (read a file here in practice).
     let key: Vec<u8> = vec![1, 2, 3, 4, 5];
     let message: Vec<u8> = std::fs::read("message.txt").unwrap();
 
-    // Produce an authentication tag.
+    // Produce an authentication tag (HMAC-SHA256).
     let signature = HMAC::sign(key.clone(), message.clone()).unwrap();
 
     // Verify the tag with the same key and message -> true.
-    let is_valid = HMAC::verify(key, message, signature).unwrap();
-    println!("hmac valid: {}", is_valid); // true
+    let is_valid = HMAC::verify(key.clone(), message.clone(), signature).unwrap();
+    println!("hmac-sha256 valid: {}", is_valid); // true
+
+    // Same API with HMAC-SHA512.
+    let signature = HMACSha512::sign(key.clone(), message.clone()).unwrap();
+    let is_valid = HMACSha512::verify(key, message, signature).unwrap();
+    println!("hmac-sha512 valid: {}", is_valid); // true
 }
 ```
 
