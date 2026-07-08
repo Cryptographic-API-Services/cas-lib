@@ -24,3 +24,10 @@ pub struct SlhDsaKeyPair {
     pub signing_key: Vec<u8>,
     pub verification_key: Vec<u8>,
 }
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct MlDsaKeyPair {
+    pub signing_key: Vec<u8>,
+    pub verification_key: Vec<u8>,
+}
