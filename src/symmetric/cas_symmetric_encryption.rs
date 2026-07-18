@@ -46,6 +46,22 @@ pub trait CASAES128SIVEncryption {
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
 }
 
+pub trait CASAES256KeyWrap {
+    fn generate_kek() -> Vec<u8>;
+    fn wrap_key(kek: Vec<u8>, key_to_wrap: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn unwrap_key(kek: Vec<u8>, wrapped_key: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn wrap_key_with_padding(kek: Vec<u8>, key_to_wrap: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn unwrap_key_with_padding(kek: Vec<u8>, wrapped_key: Vec<u8>) -> CasResult<Vec<u8>>;
+}
+
+pub trait CASAES128KeyWrap {
+    fn generate_kek() -> Vec<u8>;
+    fn wrap_key(kek: Vec<u8>, key_to_wrap: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn unwrap_key(kek: Vec<u8>, wrapped_key: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn wrap_key_with_padding(kek: Vec<u8>, key_to_wrap: Vec<u8>) -> CasResult<Vec<u8>>;
+    fn unwrap_key_with_padding(kek: Vec<u8>, wrapped_key: Vec<u8>) -> CasResult<Vec<u8>>;
+}
+
 pub trait Chacha20Poly1305Encryption {
     fn generate_key() -> Vec<u8>;
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
