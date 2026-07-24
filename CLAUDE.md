@@ -44,7 +44,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 
 | Module | Algorithms |
 |---|---|
-| `symmetric` | AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305 |
+| `symmetric` | AES-128-GCM, AES-256-GCM, AES-KW/KWP, ChaCha20-Poly1305 |
 | `hashers` | BLAKE2b, BLAKE2s, SHA-2, SHA-3 |
 | `password_hashers` | Argon2, bcrypt, scrypt, PBKDF2 |
 | `asymmetric` | RSA (key generation, sign/verify) |

@@ -214,6 +214,41 @@ fn main() {
 }
 ```
 
+### AES Key Wrapping (AES-KW / AES-KWP)
+
+The `CASAES256KeyWrap` / `CASAES128KeyWrap` traits implement AES Key Wrap
+(RFC 3394 / NIST SP 800-38F KW) and AES Key Wrap with Padding (RFC 5649 / KWP).
+They protect a data key under a key-encryption key (KEK), so the KEK can be
+rotated by re-wrapping the data key instead of re-encrypting all the data.
+`wrap_key` requires key data that is a multiple of 8 bytes and at least 16
+bytes; `wrap_key_with_padding` accepts any length from 1 byte up.
+
+```rust
+use cas_lib::symmetric::{
+    aes_kw::CASAES256KW, cas_symmetric_encryption::CASAES256KeyWrap,
+};
+
+fn main() {
+    // The data key encrypts your data; the KEK only ever wraps the data key.
+    let kek = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
+    let data_key = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
+
+    let wrapped =
+        <CASAES256KW as CASAES256KeyWrap>::wrap_key(kek.clone(), data_key.clone()).unwrap();
+
+    // Rotate the KEK: unwrap with the old KEK, re-wrap with a new one.
+    // The data key never changes, so the data does not need re-encrypting.
+    let new_kek = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
+    let recovered = <CASAES256KW as CASAES256KeyWrap>::unwrap_key(kek, wrapped).unwrap();
+    let rewrapped =
+        <CASAES256KW as CASAES256KeyWrap>::wrap_key(new_kek.clone(), recovered).unwrap();
+
+    let unwrapped =
+        <CASAES256KW as CASAES256KeyWrap>::unwrap_key(new_kek, rewrapped).unwrap();
+    assert_eq!(unwrapped, data_key);
+}
+```
+
 
 ## Hashers
 
