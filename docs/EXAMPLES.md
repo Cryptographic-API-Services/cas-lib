@@ -291,6 +291,31 @@ fn main() {
 }
 ```
 
+### SHA-2 (SHA-256 / SHA-512)
+
+`CASSHA` above uses SHA-3. For SHA-2 (FIPS 180-4) use `CASSHA2`, which implements
+the same `CASHasher` trait: `hash_256` / `verify_256` use SHA-256 (32-byte digest)
+and `hash_512` / `verify_512` use SHA-512 (64-byte digest).
+
+```rust
+use cas_lib::hashers::{cas_hasher::CASHasher, sha2::CASSHA2};
+
+fn main() {
+    let data = b"abc".to_vec();
+
+    // SHA-256("abc") = ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+    let digest = <CASSHA2 as CASHasher>::hash_256(data.clone());
+    println!("sha-256 length: {}", digest.len()); // 32
+
+    let verified = <CASSHA2 as CASHasher>::verify_256(digest, data.clone());
+    println!("verify_256: {}", verified); // true
+
+    let digest_512 = <CASSHA2 as CASHasher>::hash_512(data.clone());
+    println!("sha-512 length: {}", digest_512.len()); // 64
+    println!("verify_512: {}", <CASSHA2 as CASHasher>::verify_512(digest_512, data)); // true
+}
+```
+
 
 ## Asymmetric (RSA)
 
