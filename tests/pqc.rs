@@ -220,3 +220,176 @@ mod ml_dsa_kat {
         println!("ML-DSA-65 verify KAT: {checked} vectors checked");
     }
 }
+
+/// API-contract tests for `cas_lib::pqc::ml_dsa` (ML-DSA-65, FIPS 204): encoded
+/// sizes, deterministic signing, tamper detection, and the `CasError` mapping
+/// for malformed inputs that FFI consumers rely on.
+#[cfg(test)]
+mod ml_dsa_api {
+    use cas_lib::error::CasError;
+    use cas_lib::pqc::ml_dsa;
+
+    /// FIPS 204 ML-DSA-65 encodings (signing key is serialized as its seed).
+    const SEED_LEN: usize = 32;
+    const VERIFICATION_KEY_LEN: usize = 1952;
+    const SIGNATURE_LEN: usize = 3309;
+
+    #[test]
+    fn key_and_signature_sizes_match_fips_204() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        assert_eq!(keys.signing_key.len(), SEED_LEN);
+        assert_eq!(keys.verification_key.len(), VERIFICATION_KEY_LEN);
+
+        let signature = ml_dsa::sign_message(b"size check".to_vec(), keys.signing_key).unwrap();
+        assert_eq!(signature.len(), SIGNATURE_LEN);
+    }
+
+    #[test]
+    fn key_generation_produces_distinct_keys() {
+        let a = ml_dsa::generate_signing_and_verification_key();
+        let b = ml_dsa::generate_signing_and_verification_key();
+        assert_ne!(a.signing_key, b.signing_key);
+        assert_ne!(a.verification_key, b.verification_key);
+    }
+
+    #[test]
+    fn signing_is_deterministic() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let message = b"deterministic".to_vec();
+        let first = ml_dsa::sign_message(message.clone(), keys.signing_key.clone()).unwrap();
+        let second = ml_dsa::sign_message(message, keys.signing_key).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn different_messages_produce_different_signatures() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let a = ml_dsa::sign_message(b"message a".to_vec(), keys.signing_key.clone()).unwrap();
+        let b = ml_dsa::sign_message(b"message b".to_vec(), keys.signing_key).unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn empty_message_round_trips() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let signature = ml_dsa::sign_message(Vec::new(), keys.signing_key).unwrap();
+        assert!(ml_dsa::verify_signature(Vec::new(), signature, keys.verification_key).unwrap());
+    }
+
+    #[test]
+    fn large_message_round_trips() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let message: Vec<u8> = (0..1_000_000u32).map(|i| i as u8).collect();
+        let signature = ml_dsa::sign_message(message.clone(), keys.signing_key).unwrap();
+        assert!(ml_dsa::verify_signature(message, signature, keys.verification_key).unwrap());
+    }
+
+    #[test]
+    fn signature_does_not_verify_under_another_key() {
+        let signer = ml_dsa::generate_signing_and_verification_key();
+        let other = ml_dsa::generate_signing_and_verification_key();
+        let message = b"wrong key".to_vec();
+        let signature = ml_dsa::sign_message(message.clone(), signer.signing_key).unwrap();
+        assert!(!ml_dsa::verify_signature(message, signature, other.verification_key).unwrap());
+    }
+
+    #[test]
+    fn single_bit_flip_in_message_is_rejected() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let message = b"flip a bit in me".to_vec();
+        let signature = ml_dsa::sign_message(message.clone(), keys.signing_key).unwrap();
+
+        for byte in [0, message.len() / 2, message.len() - 1] {
+            let mut tampered = message.clone();
+            tampered[byte] ^= 0x01;
+            assert!(
+                !ml_dsa::verify_signature(tampered, signature.clone(), keys.verification_key.clone()).unwrap(),
+                "tampered message byte {byte} still verified"
+            );
+        }
+    }
+
+    #[test]
+    fn tampered_signature_is_rejected() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let message = b"tamper with the signature".to_vec();
+        let signature = ml_dsa::sign_message(message.clone(), keys.signing_key).unwrap();
+
+        // Cover the challenge (c~), the response z, and the trailing hint bytes.
+        for byte in [0, 100, SIGNATURE_LEN / 2, SIGNATURE_LEN - 1] {
+            let mut tampered = signature.clone();
+            tampered[byte] ^= 0x01;
+            // A malformed hint encoding is rejected at parse time (`Err`); either
+            // way the signature must not verify.
+            let verified = ml_dsa::verify_signature(message.clone(), tampered, keys.verification_key.clone())
+                .unwrap_or(false);
+            assert!(!verified, "tampered signature byte {byte} still verified");
+        }
+    }
+
+    #[test]
+    fn tampered_verification_key_is_rejected() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let message = b"tamper with the key".to_vec();
+        let signature = ml_dsa::sign_message(message.clone(), keys.signing_key).unwrap();
+
+        let mut tampered_vk = keys.verification_key.clone();
+        tampered_vk[VERIFICATION_KEY_LEN / 2] ^= 0x01;
+        let verified = ml_dsa::verify_signature(message, signature, tampered_vk).unwrap_or(false);
+        assert!(!verified);
+    }
+
+    #[test]
+    fn all_zero_signature_is_rejected() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let verified = ml_dsa::verify_signature(b"zeros".to_vec(), vec![0u8; SIGNATURE_LEN], keys.verification_key)
+            .unwrap_or(false);
+        assert!(!verified);
+    }
+
+    #[test]
+    fn sign_rejects_malformed_signing_key() {
+        for len in [0, 1, SEED_LEN - 1, SEED_LEN + 1, VERIFICATION_KEY_LEN] {
+            assert_eq!(
+                ml_dsa::sign_message(b"msg".to_vec(), vec![0u8; len]),
+                Err(CasError::InvalidKey),
+                "signing key of length {len} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn verify_rejects_malformed_verification_key() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let signature = ml_dsa::sign_message(b"msg".to_vec(), keys.signing_key.clone()).unwrap();
+
+        for bad_vk in [Vec::new(), vec![0u8; VERIFICATION_KEY_LEN - 1], vec![0u8; VERIFICATION_KEY_LEN + 1], keys.signing_key] {
+            assert_eq!(
+                ml_dsa::verify_signature(b"msg".to_vec(), signature.clone(), bad_vk.clone()),
+                Err(CasError::InvalidKey),
+                "verification key of length {} was accepted",
+                bad_vk.len()
+            );
+        }
+    }
+
+    #[test]
+    fn verify_rejects_malformed_signature_length() {
+        let keys = ml_dsa::generate_signing_and_verification_key();
+        let message = b"msg".to_vec();
+        let signature = ml_dsa::sign_message(message.clone(), keys.signing_key).unwrap();
+
+        let truncated = signature[..SIGNATURE_LEN - 1].to_vec();
+        let mut extended = signature.clone();
+        extended.push(0);
+
+        for bad_sig in [Vec::new(), truncated, extended] {
+            assert_eq!(
+                ml_dsa::verify_signature(message.clone(), bad_sig.clone(), keys.verification_key.clone()),
+                Err(CasError::InvalidSignature),
+                "signature of length {} was accepted",
+                bad_sig.len()
+            );
+        }
+    }
+}
