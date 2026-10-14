@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use cas_lib::hashers::{cas_hasher::CASHasher, sha::CASSHA};
+use cas_lib::hashers::{cas_hasher::CASHasher, sha::CASSHA, sha2::CASSHA2};
 
 #[cfg(test)]
 mod hashers {
@@ -84,6 +84,22 @@ mod hashers {
         }
     }
 
+    fn assert_sha2_256_vectors(path: &str) {
+        for case in parse_rsp_file(path) {
+            let hash = <CASSHA2 as CASHasher>::hash_256(case.message.clone());
+            assert_eq!(hash, case.digest);
+            assert!(<CASSHA2 as CASHasher>::verify_256(case.digest, case.message));
+        }
+    }
+
+    fn assert_sha2_512_vectors(path: &str) {
+        for case in parse_rsp_file(path) {
+            let hash = <CASSHA2 as CASHasher>::hash_512(case.message.clone());
+            assert_eq!(hash, case.digest);
+            assert!(<CASSHA2 as CASHasher>::verify_512(case.digest, case.message));
+        }
+    }
+
     #[test]
     fn test_sha_256_compare_fail() {
         let path = Path::new("tests/test.docx");
@@ -152,5 +168,69 @@ mod hashers {
     #[test]
     fn test_sha3_512_long_msg_rsp_vectors() {
         assert_sha3_512_vectors("tests/data/hashers/SHA3_512LongMsg.rsp");
+    }
+
+    #[test]
+    fn test_sha2_256_compare_fail() {
+        let path = Path::new("tests/test.docx");
+        let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
+        let hash = <CASSHA2 as CASHasher>::hash_256(file_bytes);
+
+        let path_2 = Path::new("tests/test2.docx");
+        let file_bytes_2: Vec<u8> = std::fs::read(path_2).unwrap();
+        let hash_2 = <CASSHA2 as CASHasher>::hash_256(file_bytes_2);
+
+        assert_ne!(hash, hash_2);
+    }
+
+    #[test]
+    fn test_sha2_512_compare_fail() {
+        let path = Path::new("tests/test.docx");
+        let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
+        let hash = <CASSHA2 as CASHasher>::hash_512(file_bytes);
+
+        let path_2 = Path::new("tests/test2.docx");
+        let file_bytes_2: Vec<u8> = std::fs::read(path_2).unwrap();
+        let hash_2 = <CASSHA2 as CASHasher>::hash_512(file_bytes_2);
+
+        assert_ne!(hash, hash_2);
+    }
+
+    #[test]
+    fn test_sha2_256_verify_rejects_wrong_digest() {
+        let data = b"cas-lib sha2".to_vec();
+        let mut digest = <CASSHA2 as CASHasher>::hash_256(data.clone());
+        assert_eq!(digest.len(), 32);
+        digest[0] ^= 0x01;
+        assert!(!<CASSHA2 as CASHasher>::verify_256(digest, data));
+    }
+
+    #[test]
+    fn test_sha2_512_verify_rejects_wrong_digest() {
+        let data = b"cas-lib sha2".to_vec();
+        let mut digest = <CASSHA2 as CASHasher>::hash_512(data.clone());
+        assert_eq!(digest.len(), 64);
+        digest[0] ^= 0x01;
+        assert!(!<CASSHA2 as CASHasher>::verify_512(digest, data));
+    }
+
+    #[test]
+    fn test_sha2_256_short_msg_rsp_vectors() {
+        assert_sha2_256_vectors("tests/data/hashers/SHA256ShortMsg.rsp");
+    }
+
+    #[test]
+    fn test_sha2_256_long_msg_rsp_vectors() {
+        assert_sha2_256_vectors("tests/data/hashers/SHA256LongMsg.rsp");
+    }
+
+    #[test]
+    fn test_sha2_512_short_msg_rsp_vectors() {
+        assert_sha2_512_vectors("tests/data/hashers/SHA512ShortMsg.rsp");
+    }
+
+    #[test]
+    fn test_sha2_512_long_msg_rsp_vectors() {
+        assert_sha2_512_vectors("tests/data/hashers/SHA512LongMsg.rsp");
     }
 }

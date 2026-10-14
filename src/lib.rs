@@ -12,6 +12,7 @@ pub mod hashers {
     pub mod blake2;
     pub mod cas_hasher;
     pub mod sha;
+    pub mod sha2;
 }
 
 pub mod key_exchange {
