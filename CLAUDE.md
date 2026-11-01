@@ -67,6 +67,10 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 
 NIST/FIPS and Project Wycheproof known-answer test vectors live in [tests/data/](tests/data/) and are consumed by the integration tests in [tests/symmetric.rs](tests/symmetric.rs), [tests/hashers.rs](tests/hashers.rs), and [tests/pqc.rs](tests/pqc.rs). When adding a new algorithm or variant, add the corresponding test vectors there.
 
+### Usage Examples
+
+Usage examples for every public API live in [docs/EXAMPLES.md](docs/EXAMPLES.md). **Whenever you add, change, or remove a public API (a new algorithm, a new trait method or free function, a changed signature or return type), update the examples in the same change**: add a complete, runnable `fn main()` example for anything new, fix any example that no longer compiles, and keep the Table of Contents in sync. Examples must use the real module paths and handle `CasResult` (e.g. `.unwrap()` or `?`) so they compile when pasted into a fresh crate that depends on `cas-lib`.
+
 ### CI
 
 - PRs run `cargo build --release` and `cargo test --release` on Linux, Windows, and macOS (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`, `.github/workflows/macos-pr.yml`).

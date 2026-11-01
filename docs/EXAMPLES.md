@@ -33,40 +33,128 @@ cargo run
 - [Message Authentication (HMAC)](#message-authentication-hmac)
 - [Hybrid (HPKE)](#hybrid-hpke)
 - [Sponges (ASCON-AEAD)](#sponges-ascon-aead)
-- [Compression (Zstandard)](#compression-zstandard)
+- [Post-Quantum (ML-KEM, ML-DSA, SLH-DSA)](#post-quantum-ml-kem-ml-dsa-slh-dsa)
+- [Error Handling](#error-handling)
 
 ## Password Hashers
+
+`CASArgon`, `CASBCrypt`, and `CASScrypt` each expose `hash_password` (with a
+random salt and sensible default parameters), a customized variant, and
+`verify_password`. Hashes are returned as self-describing PHC / modular-crypt
+strings that embed the salt and parameters, so store the string as-is and pass
+it back to `verify_password` later. `verify_password` returns `Ok(false)` for a
+wrong password and an `Err` only when the stored hash cannot be parsed.
+
 ### Argon2
 ```rust
-use cas_lib::password_hashers::{argon2::CASArgon, cas_password_hasher::CASPasswordHasher};
+use cas_lib::password_hashers::argon2::CASArgon;
 
 fn main() {
-let password_to_hash = "HashThisBadPassword".to_string();
-let hash = CASArgon::hash_password(password_to_hash);
-println!("{}", hash)
+    let password = "HashThisBadPassword".to_string();
+
+    // Argon2id with the library defaults.
+    let hash = CASArgon::hash_password(password.clone()).unwrap();
+    println!("{}", hash);
+
+    println!("correct: {}", CASArgon::verify_password(hash.clone(), password.clone()).unwrap()); // true
+    println!("wrong:   {}", CASArgon::verify_password(hash, "nope".to_string()).unwrap()); // false
+
+    // Custom parameters: memory cost in MiB, iterations, parallelism.
+    let tuned_hash = CASArgon::hash_password_parameters(64, 3, 4, password.clone()).unwrap();
+    println!("tuned verifies: {}", CASArgon::verify_password(tuned_hash, password).unwrap()); // true
 }
 ```
+
+#### Deriving an AES key from a password
+
+`derive_aes_128_key` / `derive_aes_256_key` stretch a password into a 16- or
+32-byte key with Argon2. A fresh random salt is used on every call and is not
+returned, so the derived key cannot be re-derived later — keep the key itself
+(for example, wrapped with [AES-KW](#aes-key-wrapping-aes-kw--aes-kwp)). Use
+[PBKDF2](#pbkdf2) when you need to re-derive the same key from the password.
+
+```rust
+use cas_lib::password_hashers::argon2::CASArgon;
+use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
+
+fn main() {
+    let key = CASArgon::derive_aes_256_key(b"correct horse battery staple".to_vec()).unwrap();
+    assert_eq!(key.len(), 32);
+
+    let nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+    let ciphertext =
+        <CASAES256 as CASAES256Encryption>::encrypt_plaintext(key.clone(), nonce.clone(), b"hello".to_vec())
+            .unwrap();
+    let plaintext =
+        <CASAES256 as CASAES256Encryption>::decrypt_ciphertext(key, nonce, ciphertext).unwrap();
+    assert_eq!(plaintext, b"hello");
+}
+```
+
 ### BCrypt
 ```rust
-use cas_lib::password_hashers::{bcrypt::CASBCrypt, cas_password_hasher::CASPasswordHasher};
+use cas_lib::password_hashers::bcrypt::CASBCrypt;
 
-let password_to_hash = "HashThisBadPassword".to_string();
-let hash = CASBCrypt::hash_password(password_to_hash);
-println!("{}", hash);
+fn main() {
+    let password = "HashThisBadPassword".to_string();
+
+    // Default cost (12).
+    let hash = CASBCrypt::hash_password(password.clone()).unwrap();
+    println!("{}", hash);
+    println!("verified: {}", CASBCrypt::verify_password(hash, password.clone()).unwrap()); // true
+
+    // Custom cost (4-31); each +1 doubles the work.
+    let hash = CASBCrypt::hash_password_customized(password.clone(), 10).unwrap();
+    println!("verified: {}", CASBCrypt::verify_password(hash, password).unwrap()); // true
+}
 ```
+
 ### SCrypt
 ```rust
-use cas_lib::password_hashers::{bcrypt::CASScrypt, cas_password_hasher::CASPasswordHasher};
+use cas_lib::password_hashers::scrypt::CASScrypt;
 
-let password_to_hash = "HashThisBadPassword".to_string();
-let hash = CASScrypt::hash_password(password_to_hash);
-println!("{}", hash);
+fn main() {
+    let password = "HashThisBadPassword".to_string();
+
+    let hash = CASScrypt::hash_password(password.clone()).unwrap();
+    println!("{}", hash);
+    println!("verified: {}", CASScrypt::verify_password(hash, password.clone()).unwrap()); // true
+
+    // Custom parameters: log2(N) = 15, r = 8, p = 1.
+    let hash = CASScrypt::hash_password_customized(password.clone(), 15, 8, 1).unwrap();
+    println!("verified: {}", CASScrypt::verify_password(hash, password).unwrap()); // true
+}
+```
+
+### PBKDF2
+
+The `pbkdf2` module exposes free functions that derive a 32-byte key with
+PBKDF2-HMAC-SHA3-256. `derivation` generates a salt and returns it alongside
+the key; store the salt and iteration count so `derivation_with_salt` can
+re-derive the identical key later.
+
+```rust
+use cas_lib::password_hashers::pbkdf2::{derivation, derivation_with_salt};
+
+fn main() {
+    let password = b"HashThisBadPassword".to_vec();
+    let iterations = 600_000;
+
+    // First time: derive a key and get a fresh salt back.
+    let result = derivation(password.clone(), iterations);
+    println!("key length: {}", result.password.len()); // 32
+
+    // Later: the same password + salt + iterations re-derives the same key.
+    let rederived = derivation_with_salt(password, iterations, result.salt);
+    assert_eq!(result.password, rederived);
+}
 ```
 
 
 ## Symmetric
 
-The symmetric module exposes AES-128-GCM, AES-256-GCM, and ChaCha20-Poly1305.
+The symmetric module exposes AES-128-GCM, AES-256-GCM, AES-128/256-GCM-SIV,
+ChaCha20-Poly1305, and AES key wrapping.
 Nonces and keys are generated for you via `OsRng` — you never supply them
 yourself. `encrypt_plaintext` returns the ciphertext with the authentication tag
 appended; pass that same output back to `decrypt_ciphertext`. Each operation
@@ -249,6 +337,112 @@ fn main() {
 }
 ```
 
+Use the padded variant (KWP) for key material whose length is not a multiple of
+8 bytes, such as a 5-byte secret or a serialized private key. A value wrapped
+with `wrap_key_with_padding` must be unwrapped with `unwrap_key_with_padding`.
+`CASAES128KW` implements the same API with a 16-byte KEK.
+
+```rust
+use cas_lib::symmetric::{
+    aes_kw::CASAES128KW, cas_symmetric_encryption::CASAES128KeyWrap,
+};
+
+fn main() {
+    let kek = <CASAES128KW as CASAES128KeyWrap>::generate_kek();
+    assert_eq!(kek.len(), 16);
+
+    // 5 bytes: not a multiple of 8, so plain wrap_key would reject it.
+    let secret = b"hello".to_vec();
+    assert!(<CASAES128KW as CASAES128KeyWrap>::wrap_key(kek.clone(), secret.clone()).is_err());
+
+    let wrapped =
+        <CASAES128KW as CASAES128KeyWrap>::wrap_key_with_padding(kek.clone(), secret.clone())
+            .unwrap();
+    let unwrapped =
+        <CASAES128KW as CASAES128KeyWrap>::unwrap_key_with_padding(kek, wrapped).unwrap();
+    assert_eq!(unwrapped, secret);
+}
+```
+
+### AES-GCM-SIV
+
+`CASAES256SIV` / `CASAES128SIV` provide AES-GCM-SIV (RFC 8452), a
+nonce-misuse-resistant AEAD. Accidentally reusing a nonce with GCM-SIV only
+reveals whether two messages were identical, instead of breaking
+confidentiality and authenticity as it does with plain GCM. Still generate a
+fresh nonce for each message. The API mirrors the AES-GCM types.
+
+```rust
+use cas_lib::symmetric::{
+    aes_gcm_siv::CASAES256SIV, cas_symmetric_encryption::CASAES256SIVEncryption,
+};
+
+fn main() {
+    let file_bytes: Vec<u8> = std::fs::read("secret.docx").unwrap();
+
+    let key = <CASAES256SIV as CASAES256SIVEncryption>::generate_key();
+    let nonce = <CASAES256SIV as CASAES256SIVEncryption>::generate_nonce();
+
+    let encrypted_bytes = <CASAES256SIV as CASAES256SIVEncryption>::encrypt_plaintext(
+        key.clone(),
+        nonce.clone(),
+        file_bytes.clone(),
+    )
+    .unwrap();
+    let decrypted_bytes =
+        <CASAES256SIV as CASAES256SIVEncryption>::decrypt_ciphertext(key, nonce, encrypted_bytes)
+            .unwrap();
+
+    assert_eq!(file_bytes, decrypted_bytes);
+}
+```
+
+### Importing and deriving AES keys
+
+Every AES type also offers `key_from_vec`, which validates an existing key
+(returning `CasError::InvalidKey` on the wrong length), and
+`key_from_x25519_shared_secret`, which runs HKDF-SHA256 over an
+[X25519](#key-exchange-x25519) shared secret to produce a key of the right size.
+This is how two parties turn a key exchange into a shared encryption key.
+
+```rust
+use cas_lib::key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519};
+use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
+
+fn main() {
+    // Alice and Bob agree on a shared secret.
+    let alice = X25519::generate_secret_and_public_key();
+    let bob = X25519::generate_secret_and_public_key();
+    let alice_shared = X25519::diffie_hellman(alice.secret_key, bob.public_key).unwrap();
+    let bob_shared = X25519::diffie_hellman(bob.secret_key, alice.public_key).unwrap();
+
+    // Each side derives the same AES-256 key from it.
+    let alice_key =
+        <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(alice_shared).unwrap();
+    let bob_key =
+        <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(bob_shared).unwrap();
+    assert_eq!(alice_key, bob_key);
+
+    // Alice encrypts, Bob decrypts. The nonce travels alongside the ciphertext.
+    let nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+    let ciphertext = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(
+        alice_key,
+        nonce.clone(),
+        b"meet at noon".to_vec(),
+    )
+    .unwrap();
+    let plaintext =
+        <CASAES256 as CASAES256Encryption>::decrypt_ciphertext(bob_key, nonce, ciphertext).unwrap();
+    assert_eq!(plaintext, b"meet at noon");
+
+    // key_from_vec validates key bytes you already have (e.g. loaded from storage).
+    let stored_key = vec![7u8; 32];
+    let key = <CASAES256 as CASAES256Encryption>::key_from_vec(stored_key).unwrap();
+    assert_eq!(key.len(), 32);
+    assert!(<CASAES256 as CASAES256Encryption>::key_from_vec(vec![0u8; 31]).is_err());
+}
+```
+
 
 ## Hashers
 
@@ -316,6 +510,28 @@ fn main() {
 }
 ```
 
+### BLAKE2 (BLAKE2s-256 / BLAKE2b-512)
+
+`CASBlake2` implements `CASHasher` too: `hash_256` / `verify_256` use
+BLAKE2s-256 and `hash_512` / `verify_512` use BLAKE2b-512. BLAKE2 is a fast
+alternative to SHA-2/SHA-3 for checksums and content addressing.
+
+```rust
+use cas_lib::hashers::{blake2::CASBlake2, cas_hasher::CASHasher};
+
+fn main() {
+    let file_bytes: Vec<u8> = std::fs::read("file_a.docx").unwrap();
+
+    let digest = <CASBlake2 as CASHasher>::hash_256(file_bytes.clone());
+    println!("blake2s-256 length: {}", digest.len()); // 32
+    println!("verify_256: {}", <CASBlake2 as CASHasher>::verify_256(digest, file_bytes.clone())); // true
+
+    let digest_512 = <CASBlake2 as CASHasher>::hash_512(file_bytes.clone());
+    println!("blake2b-512 length: {}", digest_512.len()); // 64
+    println!("verify_512: {}", <CASBlake2 as CASHasher>::verify_512(digest_512, file_bytes)); // true
+}
+```
+
 
 ## Asymmetric (RSA)
 
@@ -372,6 +588,37 @@ fn main() {
     let is_valid =
         ed25519_verify_with_public_key(signature.public_key, signature.signature, message).unwrap();
     println!("signature valid: {}", is_valid); // true
+}
+```
+
+The signer can also verify with the key pair it holds, via
+`ed25519_verify_with_key_pair`. Verification returns `Ok(false)` for a valid
+signature over different bytes, and an `Err` only for malformed keys or
+signatures.
+
+```rust
+use cas_lib::signatures::ed25519::{
+    ed25519_sign_with_key_pair, ed25519_verify_with_key_pair, get_ed25519_key_pair,
+};
+
+fn main() {
+    let key_pair = get_ed25519_key_pair();
+    let message = b"pay bob 10".to_vec();
+
+    let signature = ed25519_sign_with_key_pair(key_pair.key_pair.clone(), message.clone()).unwrap();
+
+    let ok = ed25519_verify_with_key_pair(
+        key_pair.key_pair.clone(),
+        signature.signature.clone(),
+        message,
+    )
+    .unwrap();
+    println!("original message: {}", ok); // true
+
+    let tampered =
+        ed25519_verify_with_key_pair(key_pair.key_pair, signature.signature, b"pay bob 1000".to_vec())
+            .unwrap();
+    println!("tampered message: {}", tampered); // false
 }
 ```
 
@@ -468,6 +715,37 @@ fn main() {
 }
 ```
 
+The `info` value binds the ciphertext to a context, and decryption fails if a
+different one is supplied. `generate_key_pair` hands you a random one, but you
+can create another with `CASHPKE::generate_info_str()` (a random 16-byte UUID) or
+pass any application-specific bytes, as long as sender and recipient agree.
+
+```rust
+use cas_lib::hybrid::{cas_hybrid::CASHybrid, hpke::CASHPKE};
+
+fn main() {
+    let (private_key, public_key, _) = CASHPKE::generate_key_pair();
+    let info = CASHPKE::generate_info_str();
+
+    let (encapped_key, ciphertext, tag) =
+        CASHPKE::encrypt(b"hello".to_vec(), public_key, info.clone()).unwrap();
+
+    // A mismatched info string is rejected.
+    let wrong_info = CASHPKE::generate_info_str();
+    assert!(CASHPKE::decrypt(
+        ciphertext.clone(),
+        private_key.clone(),
+        encapped_key.clone(),
+        tag.clone(),
+        wrong_info
+    )
+    .is_err());
+
+    let plaintext = CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info).unwrap();
+    assert_eq!(plaintext, b"hello");
+}
+```
+
 
 ## Sponges (ASCON-AEAD)
 
@@ -527,5 +805,130 @@ fn main() {
     // Decompress back to the original bytes.
     let decompressed: Vec<u8> = decompress(compressed).unwrap();
     assert_eq!(original, decompressed);
+}
+```
+
+
+## Post-Quantum (ML-KEM, ML-DSA, SLH-DSA)
+
+The `pqc` module exposes free functions (not trait methods) for NIST's
+post-quantum standards. Keys, ciphertexts, and signatures are raw bytes.
+
+### ML-KEM-1024 (FIPS 203)
+
+ML-KEM is a key-encapsulation mechanism: the sender encapsulates to the
+recipient's public key, producing a ciphertext and a 32-byte shared secret; the
+recipient decapsulates the ciphertext to recover the same secret. Use the shared
+secret as a symmetric key, for example with AES-256-GCM.
+
+```rust
+use cas_lib::pqc::ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate};
+use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
+
+fn main() {
+    // Recipient generates a key pair and publishes the public key.
+    let recipient = ml_kem_1024_generate();
+
+    // Sender encapsulates: the ciphertext goes to the recipient, the secret stays local.
+    let encap = ml_kem_1024_encapsulate(recipient.public_key).unwrap();
+
+    // Recipient recovers the same shared secret.
+    let shared_secret = ml_kem_1024_decapsulate(recipient.secret_key, encap.ciphertext).unwrap();
+    assert_eq!(shared_secret, encap.shared_secret);
+
+    // The 32-byte secret works directly as an AES-256 key.
+    let key = <CASAES256 as CASAES256Encryption>::key_from_vec(shared_secret).unwrap();
+    let nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+    let file_bytes: Vec<u8> = std::fs::read("secret.docx").unwrap();
+    let ciphertext =
+        <CASAES256 as CASAES256Encryption>::encrypt_plaintext(key, nonce, file_bytes).unwrap();
+    println!("encrypted {} bytes", ciphertext.len());
+}
+```
+
+### ML-DSA-65 (FIPS 204)
+
+ML-DSA is a lattice-based signature scheme with small signatures and fast
+signing. The signing key is serialized as its 32-byte seed.
+
+```rust
+use cas_lib::pqc::ml_dsa::{generate_signing_and_verification_key, sign_message, verify_signature};
+
+fn main() {
+    let key_pair = generate_signing_and_verification_key();
+    let document: Vec<u8> = std::fs::read("contract.pdf").unwrap();
+
+    let signature = sign_message(document.clone(), key_pair.signing_key).unwrap();
+
+    let is_valid =
+        verify_signature(document, signature.clone(), key_pair.verification_key.clone()).unwrap();
+    println!("signature valid: {}", is_valid); // true
+
+    let tampered = verify_signature(b"other".to_vec(), signature, key_pair.verification_key).unwrap();
+    println!("tampered valid: {}", tampered); // false
+}
+```
+
+### SLH-DSA-SHAKE-128f (FIPS 205)
+
+SLH-DSA is a stateless hash-based signature scheme. It relies only on the
+security of the underlying hash function, which makes it a conservative choice,
+at the cost of much larger signatures than ML-DSA. The API is the same shape as
+ML-DSA.
+
+```rust
+use cas_lib::pqc::slh_dsa::{generate_signing_and_verification_key, sign_message, verify_signature};
+
+fn main() {
+    let key_pair = generate_signing_and_verification_key();
+    let message: Vec<u8> = std::fs::read("message.txt").unwrap();
+
+    let signature = sign_message(message.clone(), key_pair.signing_key).unwrap();
+    println!("signature length: {}", signature.len());
+
+    let is_valid = verify_signature(message, signature, key_pair.verification_key).unwrap();
+    println!("signature valid: {}", is_valid); // true
+}
+```
+
+
+## Error Handling
+
+Every fallible operation returns `CasResult<T>` (an alias for
+`Result<T, CasError>`) rather than panicking. The examples above call
+`.unwrap()` for brevity; in real code, match on the error or propagate it with
+`?`. `CasError` implements `std::error::Error` and `Display`, and
+`error_code()` returns the stable numeric code that the FFI bindings expose.
+
+```rust
+use cas_lib::error::{CasError, CasResult};
+use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
+
+fn decrypt_file(key: Vec<u8>, nonce: Vec<u8>, path: &str) -> CasResult<Vec<u8>> {
+    let ciphertext = std::fs::read(path).map_err(|_| CasError::InvalidInput)?;
+    <CASAES256 as CASAES256Encryption>::decrypt_ciphertext(key, nonce, ciphertext)
+}
+
+fn main() {
+    let key = <CASAES256 as CASAES256Encryption>::generate_key();
+    let nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+    let ciphertext =
+        <CASAES256 as CASAES256Encryption>::encrypt_plaintext(key, nonce.clone(), b"hi".to_vec())
+            .unwrap();
+    std::fs::write("encrypted.bin", &ciphertext).unwrap();
+
+    // Decrypting with the wrong key fails authentication instead of panicking.
+    let wrong_key = <CASAES256 as CASAES256Encryption>::generate_key();
+    match decrypt_file(wrong_key, nonce, "encrypted.bin") {
+        Ok(_) => println!("unexpected success"),
+        Err(CasError::DecryptionFailed) => println!("tag mismatch, as expected"),
+        Err(e) => println!("other error {} (code {})", e, e.error_code()),
+    }
+
+    // Wrong-length inputs are rejected up front.
+    let err = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(vec![0; 5], vec![0; 12], vec![])
+        .unwrap_err();
+    assert_eq!(err, CasError::InvalidKey);
+    println!("{} (code {})", err, err.error_code()); // invalid key: ... (code 1)
 }
 ```
