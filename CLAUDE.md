@@ -65,7 +65,9 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 
 ### Test Vectors
 
-NIST/FIPS and Project Wycheproof known-answer test vectors live in [tests/data/](tests/data/) and are consumed by the integration tests in [tests/symmetric.rs](tests/symmetric.rs), [tests/hashers.rs](tests/hashers.rs), and [tests/pqc.rs](tests/pqc.rs). When adding a new algorithm or variant, add the corresponding test vectors there.
+NIST/FIPS known-answer test vectors are committed in [tests/data/](tests/data/) and are consumed by the integration tests in [tests/symmetric.rs](tests/symmetric.rs), [tests/hashers.rs](tests/hashers.rs), [tests/message.rs](tests/message.rs), and [tests/asymmetric.rs](tests/asymmetric.rs). When adding a new algorithm or variant, add the corresponding test vectors there.
+
+Project Wycheproof vectors are **not** committed. [tests/common/wycheproof.rs](tests/common/wycheproof.rs) resolves upstream `main` of `C2SP/wycheproof` to its current commit on every test run (via `git ls-remote`), downloads the files with `curl`, and caches them per commit under `target/tmp/wycheproof/`. Tests therefore need network access, and a new upstream case the library gets wrong fails the build by design; set `WYCHEPROOF_REF` to a commit SHA to reproduce an earlier run. They are consumed by [tests/aes_kw.rs](tests/aes_kw.rs) and [tests/pqc.rs](tests/pqc.rs); see [tests/data/wycheproof/README.md](tests/data/wycheproof/README.md) for details and adding files.
 
 ### Usage Examples
 

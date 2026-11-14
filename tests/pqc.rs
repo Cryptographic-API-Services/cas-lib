@@ -1,3 +1,5 @@
+mod common;
+
 #[cfg(test)]
 mod pqc {
     use cas_lib::{hashers::sha::CASSHA, pqc::{cas_pqc::MlKemKeyPair, ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate}, slh_dsa::*}};
@@ -69,15 +71,16 @@ mod pqc {
 ///   triples; `valid` cases must verify and `invalid` cases must not.
 ///
 /// Only the empty-context cases are exercised, since the public API signs and
-/// verifies with an empty context. See [`tests/data/ml_dsa/README.md`].
+/// verifies with an empty context. The files are downloaded on first use; see
+/// `tests/data/wycheproof/README.md`.
 #[cfg(test)]
 mod ml_dsa_kat {
     use cas_lib::pqc::ml_dsa;
     use serde_json::Value;
-    use std::fs;
+    use crate::common::wycheproof::load;
 
-    const SIGN_VECTORS: &str = "tests/data/ml_dsa/mldsa_65_sign_seed_test.json";
-    const VERIFY_VECTORS: &str = "tests/data/ml_dsa/mldsa_65_verify_test.json";
+    const SIGN_VECTORS: &str = "mldsa_65_sign_seed_test.json";
+    const VERIFY_VECTORS: &str = "mldsa_65_verify_test.json";
 
     fn decode_hex(hex: &str) -> Vec<u8> {
         assert_eq!(hex.len() % 2, 0, "hex input must have an even length");
@@ -107,12 +110,6 @@ mod ml_dsa_kat {
         test.get("flags")
             .and_then(Value::as_array)
             .is_some_and(|flags| flags.iter().any(|f| f.as_str() == Some(flag)))
-    }
-
-    fn load(path: &str) -> Value {
-        let contents = fs::read_to_string(path)
-            .unwrap_or_else(|err| panic!("could not read {path}: {err}"));
-        serde_json::from_str(&contents).unwrap_or_else(|err| panic!("invalid JSON in {path}: {err}"))
     }
 
     #[test]

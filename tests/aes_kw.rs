@@ -3,6 +3,8 @@ use cas_lib::symmetric::{
     cas_symmetric_encryption::{CASAES128KeyWrap, CASAES256KeyWrap},
 };
 
+mod common;
+
 #[cfg(test)]
 mod aes_kw {
     use cas_lib::error::CasError;
@@ -25,12 +27,6 @@ mod aes_kw {
     fn hex_field(obj: &Value, key: &str) -> Vec<u8> {
         let value = obj[key].as_str().unwrap_or_else(|| panic!("missing field {key}"));
         decode_hex(value)
-    }
-
-    fn load(path: &str) -> Value {
-        let contents = std::fs::read_to_string(path)
-            .unwrap_or_else(|err| panic!("could not read {path}: {err}"));
-        serde_json::from_str(&contents).unwrap_or_else(|err| panic!("invalid JSON in {path}: {err}"))
     }
 
     /// Known-answer test vectors from RFC 3394 section 4. Only the 128-bit and
@@ -111,11 +107,11 @@ mod aes_kw {
     /// The RFC 5649 (AES-KWP) worked examples both use a 192-bit KEK, so padded
     /// mode is covered exclusively by these NIST-derived vectors.
     fn run_wycheproof_file(
-        path: &str,
+        file_name: &str,
         wrap: &dyn Fn(usize, Vec<u8>, Vec<u8>) -> Result<Vec<u8>, CasError>,
         unwrap: &dyn Fn(usize, Vec<u8>, Vec<u8>) -> Result<Vec<u8>, CasError>,
     ) {
-        let file = load(path);
+        let file = crate::common::wycheproof::load(file_name);
         let mut cases_run = 0;
 
         for group in file["testGroups"].as_array().expect("testGroups array") {
@@ -158,7 +154,7 @@ mod aes_kw {
             }
         }
 
-        assert!(cases_run > 0, "no test cases were executed from {path}");
+        assert!(cases_run > 0, "no test cases were executed from {file_name}");
     }
 
     fn kw_wrap(key_size: usize, kek: Vec<u8>, msg: Vec<u8>) -> Result<Vec<u8>, CasError> {
@@ -195,12 +191,12 @@ mod aes_kw {
 
     #[test]
     fn aes_kw_wycheproof_vectors() {
-        run_wycheproof_file("tests/data/aes/aes_wrap_test.json", &kw_wrap, &kw_unwrap);
+        run_wycheproof_file("aes_wrap_test.json", &kw_wrap, &kw_unwrap);
     }
 
     #[test]
     fn aes_kwp_wycheproof_vectors() {
-        run_wycheproof_file("tests/data/aes/aes_kwp_test.json", &kwp_wrap, &kwp_unwrap);
+        run_wycheproof_file("aes_kwp_test.json", &kwp_wrap, &kwp_unwrap);
     }
 
     #[test]
