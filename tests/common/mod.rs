@@ -1,6 +1,11 @@
 //! Shared helpers for the integration test suite.
 
+// Each test binary compiles this module separately and uses only part of it.
+#![allow(dead_code)]
+
 use std::path::PathBuf;
+
+pub mod wycheproof;
 
 /// Returns a path inside the OS temp directory for a test output file.
 ///
