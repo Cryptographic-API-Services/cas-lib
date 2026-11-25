@@ -15,14 +15,14 @@ crate-type = ["lib"]
 aes-gcm = "0.10.3"
 aes-gcm-siv = "0.11.1"
 argon2 = "0.5.2"
-bcrypt = "0.18.0"
+bcrypt = "0.19.3"
 blake2 = "0.10.6"
 rand = "0.8.6"
 rsa = { version = "0.10", features = ["pkcs1v15"] }
 getrandom = { version = "0.4", features = ["sys_rng"] } # rand_core 0.10 OS RNG for RSA key generation
 scrypt = "0.11.0"
 sha3 = "0.10.8"
-x25519-dalek = {version = "2.0.0", features = ["static_secrets"]}
+x25519-dalek = { version = "3.0.0", features = ["static_secrets", "getrandom"] }
 ascon-aead = "0.5.2"
 hmac = "0.12.1"
 sha2 = "0.10.8"
@@ -36,10 +36,13 @@ hpke = { version = "0.12.0", default-features = false, features = ["alloc", "x25
 uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-hkdf = "0.12.4"
+hkdf = "0.13.0"
+# hkdf 0.13 is built on digest 0.11, so it needs sha2 0.11; the rest of the crate is
+# still on sha2 0.10. Drop this alias once `sha2` itself moves to 0.11.
+sha2-hkdf = { package = "sha2", version = "0.11" }
 chacha20poly1305 = "0.10.1"
 slh-dsa = "0.0.3"  
-ml-kem = "0.2.1"
+ml-kem = { version = "0.3.3", features = ["getrandom", "zeroize"] }
 ml-dsa = "0.1.1"
 aes-kw = { version = "0.2.1", features = ["alloc"] }
 zeroize = "1.8"
