@@ -34,6 +34,7 @@ cargo run
 - [Hybrid (HPKE)](#hybrid-hpke)
 - [Sponges (ASCON-AEAD)](#sponges-ascon-aead)
 - [Post-Quantum (ML-KEM, ML-DSA, SLH-DSA)](#post-quantum-ml-kem-ml-dsa-slh-dsa)
+- [Handling Secret Key Material](#handling-secret-key-material)
 - [Error Handling](#error-handling)
 
 ## Password Hashers
@@ -1248,6 +1249,59 @@ fn main() {
 
     let is_valid = verify_signature(message, signature, key_pair.verification_key).unwrap();
     println!("signature valid: {}", is_valid); // true
+}
+```
+
+
+## Handling Secret Key Material
+
+`cas-lib` zeroizes the intermediate secret buffers it allocates itself (for
+example the HKDF and Argon2 derived keys and its copies of X25519 and Ed25519
+secret keys). Secrets it **returns** are plain `Vec<u8>` values that you own:
+generated and derived keys, private keys and shared secrets. Zeroize them once
+you no longer need them. FFI binding layers must zero these buffers before
+freeing them.
+
+The post-quantum result structs (`MlKemKeyPair`, `MlKemEncapResult`,
+`MlKemSharedSecret`, `SlhDsaKeyPair`, `MlDsaKeyPair`) implement
+`zeroize::Zeroize`, and their `Debug` output replaces each secret field with
+`[REDACTED; N bytes]`, so logging one with `{:?}` does not print the key. They
+do not zeroize on drop, so that you can still move their fields out.
+
+This example uses the [`zeroize`](https://crates.io/crates/zeroize) crate
+directly; add it with `cargo add zeroize`.
+
+```rust
+use cas_lib::pqc::ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate};
+use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
+use zeroize::{Zeroize, Zeroizing};
+
+fn main() {
+    // Wrap a returned key in `Zeroizing` so it is wiped when it goes out of scope.
+    let key = Zeroizing::new(<CASAES256 as CASAES256Encryption>::generate_key());
+    let nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
+    let ciphertext = <CASAES256 as CASAES256Encryption>::encrypt_plaintext(
+        key.to_vec(), // takes ownership of the key bytes, so pass a copy and keep `key` wrapped
+        nonce,
+        b"hello".to_vec(),
+    )
+    .unwrap();
+    println!("encrypted {} bytes", ciphertext.len());
+
+    // Secret fields are redacted when a result struct is logged.
+    let mut recipient = ml_kem_1024_generate();
+    println!("{:?}", recipient); // MlKemKeyPair { secret_key: [REDACTED; 3168 bytes], public_key: [...] }
+
+    let mut encap = ml_kem_1024_encapsulate(recipient.public_key.clone()).unwrap();
+    let mut shared_secret =
+        ml_kem_1024_decapsulate(recipient.secret_key.clone(), encap.ciphertext.clone()).unwrap();
+    assert_eq!(shared_secret, encap.shared_secret);
+
+    // Wipe the secrets explicitly once they are no longer needed.
+    shared_secret.zeroize();
+    encap.zeroize();
+    recipient.zeroize();
+    assert!(recipient.secret_key.is_empty());
 }
 ```
 

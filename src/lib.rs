@@ -1,3 +1,22 @@
+//! `cas-lib` wraps RustCrypto and Dalek-Cryptography behind a unified API for
+//! FFI consumers.
+//!
+//! # Secret key material
+//!
+//! The crate zeroizes the intermediate secret buffers it allocates itself: the
+//! HKDF-derived AES keys, the Argon2-derived AES keys, and the fixed-size copies
+//! of X25519 and Ed25519 secret keys. Those same functions also zeroize the
+//! secret `Vec<u8>` argument they take by value. Other functions do not yet
+//! zeroize their secret arguments.
+//!
+//! Secrets this crate **returns** (generated or derived keys, private keys,
+//! shared secrets) are plain `Vec<u8>` (or `Vec<u8>` fields of a result
+//! struct) owned by the caller. The crate cannot zeroize them for you: the
+//! caller, and in particular every FFI binding layer, must zero the buffer
+//! before it is freed, e.g. with [`zeroize::Zeroize::zeroize`] or by wrapping
+//! it in [`zeroize::Zeroizing`]. The result structs in [`pqc::cas_pqc`]
+//! implement [`zeroize::Zeroize`] and redact their secret fields in `Debug`.
+
 pub mod error;
 
 pub mod password_hashers {

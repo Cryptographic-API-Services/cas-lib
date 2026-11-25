@@ -210,6 +210,7 @@ dependencies = [
  "subtle",
  "uuid",
  "x25519-dalek",
+ "zeroize",
  "zstd",
 ]
 

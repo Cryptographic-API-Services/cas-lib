@@ -3,6 +3,7 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Params
 };
 use rand::RngCore;
+use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
 
@@ -30,30 +31,40 @@ impl CASArgon {
     }
     /// Derives a 128-bit AES key from a password using Argon2.
     /// Returns the derived key as a vector of bytes.
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
     pub fn derive_aes_128_key(password: Vec<u8>) -> CasResult<Vec<u8>> {
+        let password = Zeroizing::new(password);
         let mut rng = OsRng;
         let mut salt: [u8; 16] = [0; 16];
         rng.fill_bytes(&mut salt);
 
-        let mut key = Box::new([0u8; 16]);
+        let mut key = Zeroizing::new(vec![0u8; 16]);
         Argon2::default()
-            .hash_password_into(password.as_ref(), &salt, &mut *key)
+            .hash_password_into(password.as_ref(), &salt, &mut key)
             .map_err(|_| CasError::PasswordHashingFailed)?;
-        Ok(key.to_vec())
+        // Hand the buffer to the caller without leaving an unzeroed copy behind.
+        Ok(std::mem::take(&mut *key))
     }
 
     /// Derives a 256-bit AES key from a password using Argon2.
     /// Returns the derived key as a vector of bytes.
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
     pub fn derive_aes_256_key(password: Vec<u8>) -> CasResult<Vec<u8>> {
+        let password = Zeroizing::new(password);
         let mut rng = OsRng;
         let mut salt: [u8; 16] = [0; 16];
         rng.fill_bytes(&mut salt);
 
-        let mut key = Box::new([0u8; 32]);
+        let mut key = Zeroizing::new(vec![0u8; 32]);
         Argon2::default()
-            .hash_password_into(password.as_ref(), &salt, &mut *key)
+            .hash_password_into(password.as_ref(), &salt, &mut key)
             .map_err(|_| CasError::PasswordHashingFailed)?;
-        Ok(key.to_vec())
+        // Hand the buffer to the caller without leaving an unzeroed copy behind.
+        Ok(std::mem::take(&mut *key))
     }
 
     /// Hashes a password using Argon2.
