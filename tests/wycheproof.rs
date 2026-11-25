@@ -415,13 +415,19 @@ mod hmac {
 
 mod x25519 {
     use super::*;
+    use cas_lib::error::CasError;
     use cas_lib::key_exchange::cas_key_exchange::CASKeyExchange;
     use cas_lib::key_exchange::x25519::X25519;
 
     /// x25519-dalek clamps the private key and masks the public key's high bit
-    /// per RFC 7748, and does not reject low-order points (they yield an
-    /// all-zero secret). So `valid` and `acceptable` cases alike must produce
-    /// exactly the expected shared secret.
+    /// per RFC 7748, so every case has exactly one correct output.
+    ///
+    /// - A low-order public key forces the all-zero shared secret. Wycheproof
+    ///   flags those cases `ZeroSharedSecret` and allows rejecting them, and
+    ///   `diffie_hellman` does (#112): when the expected secret is all zeros,
+    ///   the result must be `Err(CasError::InvalidKey)`.
+    /// - Every other case, `valid` or `acceptable`, must produce exactly the
+    ///   expected shared secret.
     #[test]
     fn x25519_vectors() {
         let file_name = "x25519_test.json";
@@ -431,12 +437,17 @@ mod x25519 {
         for group in groups(&file) {
             for test in tests(group) {
                 tally.run += 1;
+                let expected = hex_field(test, "shared");
                 let shared = X25519::diffie_hellman(hex_field(test, "private"), hex_field(test, "public"));
-                tally.check(
-                    shared == Ok(hex_field(test, "shared")),
-                    test,
-                    "shared secret mismatch",
-                );
+                if expected.iter().all(|&b| b == 0) {
+                    tally.check(
+                        shared == Err(CasError::InvalidKey),
+                        test,
+                        "low-order public key (all-zero shared secret) was not rejected",
+                    );
+                } else {
+                    tally.check(shared == Ok(expected), test, "shared secret mismatch");
+                }
             }
         }
 

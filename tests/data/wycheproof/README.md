@@ -58,7 +58,9 @@ with `-- --nocapture`).
 Wycheproof's `result` is three-way. `valid` and `invalid` are asserted.
 `acceptable` passes either way, except where the algorithm defines a single
 correct output: X25519 `acceptable` cases must still produce the expected
-shared secret.
+shared secret. The exception is a low-order public key, whose expected shared
+secret is all zeros (Wycheproof flag `ZeroSharedSecret`): `diffie_hellman`
+rejects those, and the test requires `CasError::InvalidKey` for them.
 
 ## Skipped cases
 
@@ -105,7 +107,8 @@ to, so deterministic signing must reproduce the expected `sig` byte for byte.
   change the `DigestInfo` the test itself builds.
 - **PBKDF2** — the library uses HMAC-SHA3-256; Wycheproof has PBKDF2 vectors
   for HMAC-SHA1/224/256/384/512 only.
-- **HKDF** — used internally with a fixed `info`; not exposed.
+- **HKDF** — used internally (the `key_from_x25519_shared_secret` helpers, with
+  a cas-lib-specific `info`); not exposed.
 - **SHA-2 / SHA-3 / BLAKE2, SLH-DSA, Argon2, bcrypt, scrypt, Zstandard** —
   Wycheproof has no vectors for them. SHA-2 and SHA-3 are covered by the NIST
   files in `tests/data/hashers/`.

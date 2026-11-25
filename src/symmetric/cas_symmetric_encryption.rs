@@ -13,7 +13,9 @@ pub trait CASAES256Encryption {
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Decrypts `ciphertext || tag` under `nonce`.
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>>;
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>>;
+    /// Derives a key for this cipher from an X25519 shared secret and both parties'
+    /// public keys (in either order). See the implementation for details.
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
@@ -32,7 +34,9 @@ pub trait CASAES128Encryption {
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Decrypts `ciphertext || tag` under `nonce`.
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>>;
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>>;
+    /// Derives a key for this cipher from an X25519 shared secret and both parties'
+    /// public keys (in either order). See the implementation for details.
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
@@ -79,7 +83,9 @@ pub trait CASAES256SIVEncryption {
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Decrypts `ciphertext || tag` under `nonce`.
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>>;
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>>;
+    /// Derives a key for this cipher from an X25519 shared secret and both parties'
+    /// public keys (in either order). See the implementation for details.
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
@@ -98,7 +104,9 @@ pub trait CASAES128SIVEncryption {
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Decrypts `ciphertext || tag` under `nonce`.
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>>;
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>>;
+    /// Derives a key for this cipher from an X25519 shared secret and both parties'
+    /// public keys (in either order). See the implementation for details.
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
