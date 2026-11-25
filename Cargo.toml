@@ -26,7 +26,7 @@ ascon-aead = "0.5.2"
 hmac = "0.12.1"
 sha2 = "0.10.8"
 subtle = "2.6.1"
-zstd = "0.13"
+zstd = { version = "0.13", default-features = false } # no `legacy`: pre-v0.8 frame decoders (#107)
 hpke = "0.12.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
