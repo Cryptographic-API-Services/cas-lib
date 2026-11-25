@@ -1,0 +1,34 @@
+# release-plz configuration: https://release-plz.dev/docs/config
+#
+# Flow: every push to `main` runs .github/workflows/publish-main.yml.
+#   1. `release` publishes the version in Cargo.toml if crates.io doesn't have it
+#      yet, then creates the `v<version>` tag and a GitHub Release whose body is
+#      that version's CHANGELOG.md entry.
+#   2. `release-pr` opens (or updates) a release PR that bumps the version and
+#      adds a CHANGELOG.md entry built from the commits since the last release.
+#      Merging that PR triggers step 1.
+
+[workspace]
+# Detect API breaks with cargo-semver-checks and flag them in the release PR.
+semver_check = true
+# The workflow's `test` job already builds, tests and runs `cargo package`
+# with `--locked` on this exact commit. Skipping the verification build here
+# keeps dependency build scripts out of the job that can mint a crates.io
+# token (#106).
+publish_no_verify = true
+
+[changelog]
+# Never drop a breaking commit, whatever group it lands in.
+protect_breaking_commits = true
+# PRs are squash-merged, so each PR title becomes one changelog line.
+# The PR title workflow enforces the Conventional Commits prefixes below.
+commit_parsers = [
+    { message = "^feat", group = "added" },
+    { message = "^changed", group = "changed" },
+    { message = "^deprecated", group = "deprecated" },
+    { message = "^fix", group = "fixed" },
+    { message = "^security", group = "security" },
+    { message = "^docs", group = "documentation" },
+    { message = "^chore: release", skip = true },
+    { message = "^.*", group = "other" },
+]
