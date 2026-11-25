@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.5.0...v0.5.1) - 2026-11-25
+
+### Other
+
+- *(deps)* bump bcrypt, ml-kem, x25519-dalek, hkdf and the cargo-patch group ([#148](https://github.com/Cryptographic-API-Services/cas-lib/pull/148))
+
 ## [0.5.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.4.0...v0.5.0) - 2026-11-25
 
 Fixes the five Medium-severity findings from the November 2026 security review (#103): #108–#112. With 0.3.0 (Low, #106) and 0.4.0 (High), every Low-or-above finding is fixed, and `cargo audit` reports no advisories. The Info-level notes are tracked in #121 and #122.
