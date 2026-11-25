@@ -1,8 +1,4 @@
-use aes_gcm_siv::{
-    aead::{Aead, KeyInit},
-    Aes128GcmSiv, Aes256GcmSiv, Key, Nonce,
-};
-use rand::{rngs::OsRng, RngCore};
+use aes_gcm_siv::{Aes128GcmSiv, Aes256GcmSiv};
 
 use crate::error::{CasError, CasResult};
 use crate::key_exchange::x25519::{
@@ -30,46 +26,22 @@ impl CASAES256SIVEncryption for CASAES256SIV {
         if key_slice.len() != AES256_KEY_LEN {
             return Err(CasError::InvalidKey);
         }
-        let key = Key::<Aes256GcmSiv>::from_slice(key_slice.as_slice());
-        Ok(key.to_vec())
+        Ok(key_slice)
     }
 
     /// Generates an AES-256-GCM-SIV 32-byte key
     fn generate_key() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        Aes256GcmSiv::generate_key(&mut os_rng).to_vec()
+        aead_helpers::random_bytes(AES256_KEY_LEN)
     }
 
     /// Encrypts with AES-256-GCM-SIV taking an aes_key and nonce
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES256_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_SIV_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes256GcmSiv>::from_slice(aes_key.as_slice());
-        let cipher = Aes256GcmSiv::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .map_err(|_| CasError::EncryptionFailed)
+        aead_helpers::encrypt_with_aad::<Aes256GcmSiv>(&aes_key, &nonce, &plaintext, &[])
     }
 
     /// Decrypts with AES-256-GCM-SIV taking an aes_key and nonce
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES256_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_SIV_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes256GcmSiv>::from_slice(aes_key.as_slice());
-        let cipher = Aes256GcmSiv::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .decrypt(nonce, ciphertext.as_ref())
-            .map_err(|_| CasError::DecryptionFailed)
+        aead_helpers::decrypt_with_aad::<Aes256GcmSiv>(&aes_key, &nonce, &ciphertext, &[])
     }
 
     /// Derives a 256-bit AES-256-GCM-SIV key from an X25519 shared secret with HKDF-SHA256.
@@ -91,10 +63,7 @@ impl CASAES256SIVEncryption for CASAES256SIV {
 
     /// Generates an AES-GCM-SIV nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        let mut nonce = [0u8; AES_SIV_NONCE_LEN];
-        os_rng.fill_bytes(&mut nonce);
-        nonce.to_vec()
+        aead_helpers::random_bytes(AES_SIV_NONCE_LEN)
     }
 }
 
@@ -106,46 +75,22 @@ impl CASAES128SIVEncryption for CASAES128SIV {
         if key_slice.len() != AES128_KEY_LEN {
             return Err(CasError::InvalidKey);
         }
-        let key = Key::<Aes128GcmSiv>::from_slice(key_slice.as_slice());
-        Ok(key.to_vec())
+        Ok(key_slice)
     }
 
     /// Generates an AES-128-GCM-SIV 16-byte key
     fn generate_key() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        Aes128GcmSiv::generate_key(&mut os_rng).to_vec()
+        aead_helpers::random_bytes(AES128_KEY_LEN)
     }
 
     /// Encrypts with AES-128-GCM-SIV taking an aes_key and nonce
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES128_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_SIV_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes128GcmSiv>::from_slice(aes_key.as_slice());
-        let cipher = Aes128GcmSiv::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .map_err(|_| CasError::EncryptionFailed)
+        aead_helpers::encrypt_with_aad::<Aes128GcmSiv>(&aes_key, &nonce, &plaintext, &[])
     }
 
     /// Decrypts with AES-128-GCM-SIV taking an aes_key and nonce
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES128_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_SIV_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes128GcmSiv>::from_slice(aes_key.as_slice());
-        let cipher = Aes128GcmSiv::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .decrypt(nonce, ciphertext.as_ref())
-            .map_err(|_| CasError::DecryptionFailed)
+        aead_helpers::decrypt_with_aad::<Aes128GcmSiv>(&aes_key, &nonce, &ciphertext, &[])
     }
 
     /// Derives a 128-bit AES-128-GCM-SIV key from an X25519 shared secret with HKDF-SHA256.
@@ -167,10 +112,7 @@ impl CASAES128SIVEncryption for CASAES128SIV {
 
     /// Generates an AES-GCM-SIV nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        let mut nonce = [0u8; AES_SIV_NONCE_LEN];
-        os_rng.fill_bytes(&mut nonce);
-        nonce.to_vec()
+        aead_helpers::random_bytes(AES_SIV_NONCE_LEN)
     }
 }
 
