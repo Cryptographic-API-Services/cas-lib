@@ -47,7 +47,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 | `symmetric` | AES-128-GCM, AES-256-GCM, AES-KW/KWP, ChaCha20-Poly1305 |
 | `hashers` | BLAKE2b, BLAKE2s, SHA-2, SHA-3 |
 | `password_hashers` | Argon2, bcrypt, scrypt, PBKDF2 |
-| `asymmetric` | RSA (key generation, sign/verify) |
+| `asymmetric` | RSA (key generation, RS256 and PS256 sign/verify) |
 | `signatures` | Ed25519 |
 | `key_exchange` | X25519 |
 | `hybrid` | HPKE |
@@ -83,4 +83,4 @@ Usage examples for every public API live in [docs/EXAMPLES.md](docs/EXAMPLES.md)
 - **PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/)** (`.github/workflows/pr-title.yml`). PRs are squash-merged, so the title becomes the commit that release-plz turns into a `CHANGELOG.md` line: `feat:` → Added, `fix:` → Fixed, `security:` → Security, `docs:` → Documentation, anything else → Other. Use `!` (e.g. `feat!:`) for a breaking change.
 - Releases use [release-plz](https://release-plz.dev) (`release-plz.toml`, `.github/workflows/publish-main.yml`). Each push to `main` tests and packages the crate, publishes to crates.io only if the `Cargo.toml` version isn't published yet (then tags `v<version>` and creates a GitHub Release from the `CHANGELOG.md` entry), and opens or updates a release PR that bumps the version and writes the changelog. **Don't bump the version or edit `CHANGELOG.md` by hand in feature PRs**; merge the release PR instead. `publish-main.yml` keeps that name because the crates.io trusted publisher is bound to it.
 
-The dev profile sets `opt-level = 3` for `num-bigint-dig` (used by the RSA crate) to keep RSA key-generation fast during local development.
+The dev profile sets `opt-level = 3` for `crypto-bigint` and `crypto-primes` (used by the `rsa` crate) to keep RSA key generation fast during local development.
