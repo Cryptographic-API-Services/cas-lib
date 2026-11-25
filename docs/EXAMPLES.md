@@ -116,7 +116,7 @@ fn main() {
     println!("{}", hash);
     println!("verified: {}", CASBCrypt::verify_password(hash, password.clone()).unwrap()); // true
 
-    // Custom cost (4-31); each +1 doubles the work.
+    // Custom cost (10-16, see BCRYPT_MIN_COST / BCRYPT_MAX_COST); each +1 doubles the work.
     let hash = CASBCrypt::hash_password_customized(password.clone(), 10).unwrap();
     println!("verified: {}", CASBCrypt::verify_password(hash.clone(), password).unwrap()); // true
 
