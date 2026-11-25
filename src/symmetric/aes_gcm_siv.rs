@@ -8,7 +8,11 @@ use sha2::Sha256;
 
 use crate::error::{CasError, CasResult};
 
-use super::cas_symmetric_encryption::{CASAES128SIVEncryption, CASAES256SIVEncryption};
+use super::aead_helpers;
+use super::cas_symmetric_encryption::{
+    CASAES128SIVAadEncryption, CASAES128SIVEncryption, CASAES256SIVAadEncryption,
+    CASAES256SIVEncryption, CASAeadSeal,
+};
 
 const AES_SIV_NONCE_LEN: usize = 12;
 const AES128_KEY_LEN: usize = 16;
@@ -150,5 +154,59 @@ impl CASAES128SIVEncryption for CASAES128SIV {
         let mut nonce = [0u8; AES_SIV_NONCE_LEN];
         os_rng.fill_bytes(&mut nonce);
         nonce.to_vec()
+    }
+}
+
+impl CASAES256SIVAadEncryption for CASAES256SIV {
+    /// Encrypts with AES-256-GCM-SIV taking an aes_key, nonce and additional authenticated data
+    fn encrypt_plaintext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
+        aead_helpers::encrypt_with_aad::<Aes256GcmSiv>(&aes_key, &nonce, &plaintext, &aad)
+    }
+
+    /// Decrypts with AES-256-GCM-SIV taking an aes_key, nonce and additional authenticated data
+    fn decrypt_ciphertext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
+        aead_helpers::decrypt_with_aad::<Aes256GcmSiv>(&aes_key, &nonce, &ciphertext, &aad)
+    }
+}
+
+impl CASAES128SIVAadEncryption for CASAES128SIV {
+    /// Encrypts with AES-128-GCM-SIV taking an aes_key, nonce and additional authenticated data
+    fn encrypt_plaintext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
+        aead_helpers::encrypt_with_aad::<Aes128GcmSiv>(&aes_key, &nonce, &plaintext, &aad)
+    }
+
+    /// Decrypts with AES-128-GCM-SIV taking an aes_key, nonce and additional authenticated data
+    fn decrypt_ciphertext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
+        aead_helpers::decrypt_with_aad::<Aes128GcmSiv>(&aes_key, &nonce, &ciphertext, &aad)
+    }
+}
+
+impl CASAeadSeal for CASAES256SIV {
+    const NONCE_LEN: usize = AES_SIV_NONCE_LEN;
+
+    /// Encrypts with AES-256-GCM-SIV under a fresh random nonce and returns
+    /// `nonce || ciphertext || tag`.
+    fn seal(key: Vec<u8>, plaintext: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::seal::<Aes256GcmSiv>(&key, &plaintext, aad.as_deref())
+    }
+
+    /// Splits and decrypts a `nonce || ciphertext || tag` blob from [`CASAeadSeal::seal`].
+    fn open(key: Vec<u8>, sealed: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::open::<Aes256GcmSiv>(&key, &sealed, aad.as_deref())
+    }
+}
+
+impl CASAeadSeal for CASAES128SIV {
+    const NONCE_LEN: usize = AES_SIV_NONCE_LEN;
+
+    /// Encrypts with AES-128-GCM-SIV under a fresh random nonce and returns
+    /// `nonce || ciphertext || tag`.
+    fn seal(key: Vec<u8>, plaintext: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::seal::<Aes128GcmSiv>(&key, &plaintext, aad.as_deref())
+    }
+
+    /// Splits and decrypts a `nonce || ciphertext || tag` blob from [`CASAeadSeal::seal`].
+    fn open(key: Vec<u8>, sealed: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::open::<Aes128GcmSiv>(&key, &sealed, aad.as_deref())
     }
 }
