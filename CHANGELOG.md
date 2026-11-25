@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.4.0...v0.5.0) - 2026-11-25
+
+Fixes the five Medium-severity findings from the November 2026 security review (#103): #108–#112. With 0.3.0 (Low, #106) and 0.4.0 (High), every Low-or-above finding is fixed, and `cargo audit` reports no advisories. The Info-level notes are tracked in #121 and #122.
+
+### Breaking changes
+
+- **RSA signatures are now standard RS256** ([#141](https://github.com/Cryptographic-API-Services/cas-lib/pull/141), #111): `sign` / `verify` take the **message** and use RSASSA-PKCS1-v1_5 with SHA-256 and a DigestInfo prefix. They interoperate with OpenSSL, WebCrypto and JWS `RS256`, and messages of any length work. Signatures made by 0.4 and earlier (unprefixed PKCS#1 v1.5 over caller bytes) **no longer verify**.
+- **RSA keys:** `rsa` 0.10 refuses imported private keys whose two primes differ greatly in size (`InvalidPemKey`). `verify` now accepts public keys up to 8192 bits (was 4096). Key generation still allows 2048, 3072 and 4096 bits.
+- **X25519** ([#140](https://github.com/Cryptographic-API-Services/cas-lib/pull/140), #112): `X25519::diffie_hellman` returns `CasError::InvalidKey` for low-order peer public keys, which force an all-zero shared secret.
+- **X25519 key-derivation helpers** ([#140](https://github.com/Cryptographic-API-Services/cas-lib/pull/140), #112): every `key_from_x25519_shared_secret` (AES-128/256-GCM, AES-128/256-GCM-SIV) now takes `(shared_secret, public_key_a, public_key_b)`. The public keys can be passed in either order. The derived key is bound to the cipher and to both public keys, so it differs from 0.4's: **both peers must upgrade together.**
+- **Password-hasher cost bounds** ([#138](https://github.com/Cryptographic-API-Services/cas-lib/pull/138), #110). Out-of-range values return `InvalidParameters`:
+  - Argon2: memory 19–4096 MiB, iterations 1–10, parallelism 1–16.
+  - scrypt: log₂N 10–20, `r` 1–32, `p` 1–16.
+  - bcrypt: cost 10–16. The docs used to say 4–31.
+
+  `verify_password` checks the costs in the stored hash against the **upper** bounds before doing any work, so hostile hashes such as `$2b$31$…` are refused. Older hashes below the minimums still verify.
+
+### Added
+
+- `CASRSAEncryption::sign_pss` / `verify_pss`: RSASSA-PSS with SHA-256 (PS256), recommended for new designs ([#141](https://github.com/Cryptographic-API-Services/cas-lib/pull/141)).
+- Cost-bound constants: `argon2::{MIN,MAX}_MEMORY_COST_MIB`, `argon2::{MIN,MAX}_ITERATIONS`, `argon2::{MIN,MAX}_PARALLELISM`, `scrypt::{MIN_LOG_N, MAX_LOG_N, MAX_BLOCK_SIZE, MAX_PARALLELISM}` and `bcrypt::{BCRYPT_MIN_COST, BCRYPT_MAX_COST}` ([#138](https://github.com/Cryptographic-API-Services/cas-lib/pull/138)).
+
+### Fixed
+
+- Argon2 `hash_password_parameters` no longer wraps `memory_cost * 1024` in release builds or panics in debug builds; it returns `InvalidParameters`. The rustdoc now says the unit is MiB, not KiB ([#137](https://github.com/Cryptographic-API-Services/cas-lib/pull/137), #109).
+
+### Security
+
+- **All `cargo audit` advisories cleared** ([#139](https://github.com/Cryptographic-API-Services/cas-lib/pull/139), [#141](https://github.com/Cryptographic-API-Services/cas-lib/pull/141), #108): from 7 vulnerabilities and 13 warnings to **none**.
+  - RUSTSEC-2023-0071 (Marvin): `rsa` 0.10.
+  - RUSTSEC-2026-0387: `hpke` without the unused `p256` feature.
+  - The zstd stack: floor raised to `zstd` 0.13.6, so downstream lockfiles get `zstd-safe` 7.4.2 / `zstd-sys` 2.2.0.
+  - `ctutils`, `anyhow`, and the yanked `der` / `spin`: lockfile updates.
+
+### CI
+
+- New `cargo audit` workflow on every PR, on pushes to `main` and weekly. Unsound and yanked warnings fail it. Dependabot now covers Cargo and GitHub Actions ([#139](https://github.com/Cryptographic-API-Services/cas-lib/pull/139)).
+
 ## [0.4.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.3.0...v0.4.0) - 2026-11-25
 
 Fixes the last High-severity finding from the November 2026 security review (#103): a decompression bomb in `compression::zstd::decompress` (#107). The Medium findings are tracked in #108–#112.
