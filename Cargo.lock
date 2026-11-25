@@ -208,6 +208,7 @@ dependencies = [
  "slh-dsa",
  "uuid",
  "x25519-dalek",
+ "zeroize",
  "zstd",
 ]
 

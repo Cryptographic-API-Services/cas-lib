@@ -61,6 +61,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 - Binary inputs/outputs use `Vec<u8>`.
 - Asymmetric keys are PEM-encoded strings.
 - Nonces/IVs are generated internally via `OsRng` — callers do not supply them.
+- Secret key material: zeroize intermediate secret buffers the crate allocates (use `zeroize::Zeroizing`; to return such a buffer without a copy, `std::mem::take(&mut *buf)`). Returned secrets stay plain `Vec<u8>`/`String` owned by the caller: the FFI binding layers must zero them before freeing. Structs holding secrets must not derive `Debug`; write a `Debug` impl that redacts the secret fields (see `src/pqc/cas_pqc.rs`).
 - Fallible operations return `CasResult<T>` (`Result<T, CasError>` from [src/error.rs](src/error.rs)) rather than panicking — a panic unwinding across the FFI boundary is undefined behavior. Infallible operations (e.g. hashing in `hashers`) return their value directly. The `CasError` variants map to stable numeric codes consumed by the FFI binding crates; that mapping is an append-only ABI contract (see the doc comment on `CasError`).
 
 ### Test Vectors

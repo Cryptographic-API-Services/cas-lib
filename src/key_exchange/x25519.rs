@@ -2,6 +2,7 @@
 
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
+use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
 use super::cas_key_exchange::CASKeyExchange;
@@ -16,6 +17,9 @@ pub struct X25519;
 impl CASKeyExchange for X25519 {
     /// Generates a secret key and public key using X25519.
     /// Returns a result containing the secret key and public key as vectors of bytes.
+    ///
+    /// `secret_key` is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
     fn generate_secret_and_public_key() -> X25519SecretPublicKeyResult {
         let secret_key = StaticSecret::random_from_rng(OsRng);
         let public_key = PublicKey::from(&secret_key);
@@ -30,13 +34,21 @@ impl CASKeyExchange for X25519 {
     /// Returns the shared secret as a vector of bytes, or an error if either input
     /// is not 32 bytes long.
     /// The secret key and user's public key are expected to be in byte array format.
+    ///
+    /// The returned shared secret is owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
     fn diffie_hellman(my_secret_key: Vec<u8>, users_public_key: Vec<u8>) -> CasResult<Vec<u8>> {
-        let secret_key_bytes: [u8; 32] =
-            my_secret_key.try_into().map_err(|_| CasError::InvalidKey)?;
+        let my_secret_key = Zeroizing::new(my_secret_key);
+        let mut secret_key_bytes = Zeroizing::new([0u8; 32]);
+        if my_secret_key.len() != secret_key_bytes.len() {
+            return Err(CasError::InvalidKey);
+        }
+        secret_key_bytes.copy_from_slice(&my_secret_key);
         let public_key_bytes: [u8; 32] =
             users_public_key.try_into().map_err(|_| CasError::InvalidKey)?;
 
-        let secret_key = StaticSecret::from(secret_key_bytes);
+        // `StaticSecret` and `SharedSecret` zeroize themselves on drop.
+        let secret_key = StaticSecret::from(*secret_key_bytes);
         let public_key = PublicKey::from(public_key_bytes);
         Ok(secret_key.diffie_hellman(&public_key).as_bytes().to_vec())
     }

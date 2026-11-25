@@ -8,6 +8,7 @@ use aes_gcm::{
     Aes128Gcm, Aes256Gcm, KeyInit, Nonce,
 };
 use sha2::Sha256;
+use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
 
@@ -75,12 +76,17 @@ impl CASAES256Encryption for CASAES256 {
     }
 
     /// Creates an AES-256 key 32-byte key from an X25519 Shared Secret
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>> {
+        let shared_secret = Zeroizing::new(shared_secret);
         let hk = Hkdf::<Sha256>::new(None, &shared_secret);
-        let mut aes_key: Box<[u8; 32]> = Box::new([0u8; 32]);
-        hk.expand(b"aes key", &mut *aes_key)
+        let mut aes_key = Zeroizing::new(vec![0u8; 32]);
+        hk.expand(b"aes key", &mut aes_key)
             .map_err(|_| CasError::KeyGenerationFailed)?;
-        Ok(aes_key.to_vec())
+        // Hand the buffer to the caller without leaving an unzeroed copy behind.
+        Ok(std::mem::take(&mut *aes_key))
     }
 
 
@@ -220,12 +226,17 @@ impl CASAES128Encryption for CASAES128 {
 
 
     /// Generates an AES-128 16-byte key from an X25519 shared secret
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>> {
+        let shared_secret = Zeroizing::new(shared_secret);
         let hk = Hkdf::<Sha256>::new(None, &shared_secret);
-        let mut aes_key = Box::new([0u8; 16]);
-        hk.expand(b"aes key", &mut *aes_key)
+        let mut aes_key = Zeroizing::new(vec![0u8; 16]);
+        hk.expand(b"aes key", &mut aes_key)
             .map_err(|_| CasError::KeyGenerationFailed)?;
-        Ok(aes_key.to_vec())
+        // Hand the buffer to the caller without leaving an unzeroed copy behind.
+        Ok(std::mem::take(&mut *aes_key))
     }
 
 
