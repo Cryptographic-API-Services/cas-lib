@@ -49,6 +49,9 @@ pub enum CasError {
     PasswordHashingFailed,
     /// Compression or decompression failed.
     CompressionFailed,
+    /// Decompressed output would exceed the caller's size limit (a possible
+    /// decompression bomb). See `compression::zstd::decompress_with_limit`.
+    DecompressionLimitExceeded,
 }
 
 impl fmt::Display for CasError {
@@ -66,6 +69,7 @@ impl fmt::Display for CasError {
             CasError::KeyGenerationFailed => "key generation failed",
             CasError::PasswordHashingFailed => "password hashing failed",
             CasError::CompressionFailed => "compression or decompression failed",
+            CasError::DecompressionLimitExceeded => "decompressed output exceeds the size limit",
         };
         f.write_str(message)
     }
@@ -94,6 +98,7 @@ impl CasError {
             CasError::KeyGenerationFailed => 10,
             CasError::PasswordHashingFailed => 11,
             CasError::CompressionFailed => 12,
+            CasError::DecompressionLimitExceeded => 13,
         }
     }
 }
@@ -124,6 +129,7 @@ mod tests {
             (CasError::KeyGenerationFailed, 10),
             (CasError::PasswordHashingFailed, 11),
             (CasError::CompressionFailed, 12),
+            (CasError::DecompressionLimitExceeded, 13),
         ];
 
         for (error, code) in expected {
@@ -152,7 +158,8 @@ mod tests {
                 | CasError::SigningFailed
                 | CasError::KeyGenerationFailed
                 | CasError::PasswordHashingFailed
-                | CasError::CompressionFailed => {}
+                | CasError::CompressionFailed
+                | CasError::DecompressionLimitExceeded => {}
             }
         }
         let _ = assert_all_variants_covered;

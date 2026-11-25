@@ -33,6 +33,7 @@ cargo run
 - [Message Authentication (HMAC)](#message-authentication-hmac)
 - [Hybrid (HPKE)](#hybrid-hpke)
 - [Sponges (ASCON-AEAD)](#sponges-ascon-aead)
+- [Compression (Zstandard)](#compression-zstandard)
 - [Post-Quantum (ML-KEM, ML-DSA, SLH-DSA)](#post-quantum-ml-kem-ml-dsa-slh-dsa)
 - [Handling Secret Key Material](#handling-secret-key-material)
 - [Error Handling](#error-handling)
@@ -1148,6 +1149,13 @@ The compression module wraps Zstandard. `compress` takes the data and a
 compression level (0-22; higher means smaller but slower); `decompress` restores
 the original bytes exactly.
 
+`decompress` produces at most `DEFAULT_MAX_DECOMPRESSED_SIZE` (64 MiB) of output.
+A few kilobytes of crafted input can expand to gigabytes (a "decompression
+bomb"), so anything larger returns `CasError::DecompressionLimitExceeded`
+instead of exhausting memory. Frames that declare a back-reference window larger
+than 128 MiB, invalid data, and pre-v0.8 "legacy" Zstandard frames return
+`CasError::CompressionFailed`.
+
 ```rust
 use cas_lib::compression::zstd::{compress, decompress};
 
@@ -1163,9 +1171,33 @@ fn main() {
         compressed.len()
     );
 
-    // Decompress back to the original bytes.
+    // Decompress back to the original bytes (up to 64 MiB).
     let decompressed: Vec<u8> = decompress(compressed).unwrap();
     assert_eq!(original, decompressed);
+}
+```
+
+Use `decompress_with_limit` to set the limit yourself: lower it for small
+messages from untrusted sources, or raise it for large trusted archives. Pick
+the largest output you actually expect, since memory use grows with the limit.
+
+```rust
+use cas_lib::compression::zstd::{compress, decompress_with_limit};
+use cas_lib::error::CasError;
+
+fn main() {
+    let message = vec![b'a'; 10_000];
+    let compressed = compress(message.clone(), 3).unwrap();
+
+    // Within the limit: decompresses normally.
+    let decompressed = decompress_with_limit(compressed.clone(), 16 * 1024).unwrap();
+    assert_eq!(decompressed, message);
+
+    // Over the limit: decoding stops early with a dedicated error.
+    match decompress_with_limit(compressed, 1024) {
+        Err(CasError::DecompressionLimitExceeded) => println!("rejected: output over 1 KiB"),
+        other => panic!("unexpected result: {:?}", other.map(|d| d.len())),
+    }
 }
 ```
 
