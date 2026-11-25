@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.5.0...v0.5.1) - 2026-11-25
+
+Dependency updates only. The public API is unchanged, and so are the key, ciphertext and signature formats: keys and data from 0.5.0 keep working.
+
+### Security
+
+- **ml-kem 0.3.4** ([#149](https://github.com/Cryptographic-API-Services/cas-lib/pull/149)): hardened zeroization and constant-time equality checks, and secret key material is redacted from `Debug` output. `Cargo.toml` now requires 0.3.4, so downstream builds can't resolve 0.3.3.
+- **ML-KEM buffers are zeroized** ([#148](https://github.com/Cryptographic-API-Services/cas-lib/pull/148)): ml-kem's `zeroize` feature is enabled, and the intermediate expanded decapsulation key, the consumed secret-key input and the shared-secret buffers are wiped after use.
+
+### Other
+
+- Dependency updates ([#148](https://github.com/Cryptographic-API-Services/cas-lib/pull/148)): bcrypt 0.18 → 0.19, ml-kem 0.2 → 0.3, x25519-dalek 2 → 3, hkdf 0.12 → 0.13, and patch updates to getrandom (0.4.3), ml-dsa (0.1.2) and serde_json (1.0.154).
+- ML-KEM-1024 secret keys keep the 3168-byte expanded encoding. ml-kem 0.3 deprecates it in favour of 64-byte seeds, and moving to seeds will be a separate, breaking release.
+- HKDF-SHA256 in the X25519 key-derivation helpers now uses sha2 0.11 (required by hkdf 0.13), through a `sha2-hkdf` dependency alias. Derived keys are unchanged.
+
 ## [0.5.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.4.0...v0.5.0) - 2026-11-25
 
 Fixes the five Medium-severity findings from the November 2026 security review (#103): #108–#112. With 0.3.0 (Low, #106) and 0.4.0 (High), every Low-or-above finding is fixed, and `cargo audit` reports no advisories. The Info-level notes are tracked in #121 and #122.
