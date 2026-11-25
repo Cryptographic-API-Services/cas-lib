@@ -7,9 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.3.0...v0.4.0) - 2026-11-25
+
+Fixes the last High-severity finding from the November 2026 security review (#103): a decompression bomb in `compression::zstd::decompress` (#107). The Medium findings are tracked in #108–#112.
+
+### Breaking changes
+
+- **zstd output limit:** `decompress` produces at most `DEFAULT_MAX_DECOMPRESSED_SIZE` (64 MiB) and returns `CasError::DecompressionLimitExceeded` for anything larger, instead of growing its buffer until allocation fails and the process aborts. Callers with larger trusted data should use `decompress_with_limit`. ([#135](https://github.com/Cryptographic-API-Services/cas-lib/pull/135))
+- **New `CasError` variant:** `DecompressionLimitExceeded`, FFI error code **13**, appended per the ABI contract. Exhaustive matches, including the FFI binding crates' error-code mappings, must handle it. ([#135](https://github.com/Cryptographic-API-Services/cas-lib/pull/135))
+- **Legacy zstd frames rejected:** zstd's default features are disabled, which removes the pre-v0.8 legacy-format decoders. ([#135](https://github.com/Cryptographic-API-Services/cas-lib/pull/135))
+
+### Added
+
+- `compression::zstd::decompress_with_limit(data, max_output_size)` and the `DEFAULT_MAX_DECOMPRESSED_SIZE` constant. ([#135](https://github.com/Cryptographic-API-Services/cas-lib/pull/135))
+
+### Security
+
+- Decompression output is capped (above), and frames that declare a back-reference window larger than 128 MiB are refused before the window is allocated. ([#135](https://github.com/Cryptographic-API-Services/cas-lib/pull/135))
+
+### Documentation
+
+- `docs/EXAMPLES.md` documents the limit with a `decompress_with_limit` example, and adds the missing Compression entry to the table of contents.
+
 ## [0.3.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.2.95...v0.3.0) - 2026-11-25
 
-Fixes the Low-severity findings from the November 2026 security review (#103). The High and Medium findings are tracked in #106–#112.
+Fixes the Low-severity findings from the November 2026 security review (#103). The publish-pipeline High finding (#106) is also fixed in this release; the remaining High and Medium findings are tracked in #107–#112.
 
 ### Breaking changes
 
