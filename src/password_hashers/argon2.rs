@@ -12,15 +12,24 @@ pub struct CASArgon;
 
 impl CASArgon {
 
-    /// Hashes a password using Argon2 with custom parameters.
-    /// Returns the hashed password as a string.
+    /// Hashes a password using Argon2id with custom parameters.
+    /// Returns the hashed password as a PHC string.
     /// Parameters:
-    /// - memory_cost: Memory cost in kibibytes.
+    /// - memory_cost: Memory cost in **mebibytes (MiB)**. It is converted to the KiB
+    ///   value Argon2 uses, so `64` means 64 MiB.
     /// - iterations: Number of iterations.
     /// - parallelism: Degree of parallelism.
     /// - password_to_hash: The password to be hashed.
+    ///
+    /// Returns [`CasError::InvalidParameters`] if the parameters are rejected by Argon2,
+    /// including a `memory_cost` too large to express in KiB as a `u32`.
     pub fn hash_password_parameters(memory_cost: u32, iterations: u32, parallelism: u32, password_to_hash: String) -> CasResult<String> {
-        let params = Params::new(memory_cost * 1024, iterations, parallelism, None)
+        // MiB -> KiB. A plain multiply wraps in release builds (4_194_305 MiB becomes
+        // 1 MiB) and panics in debug builds, so check it.
+        let memory_cost_kib = memory_cost
+            .checked_mul(1024)
+            .ok_or(CasError::InvalidParameters)?;
+        let params = Params::new(memory_cost_kib, iterations, parallelism, None)
             .map_err(|_| CasError::InvalidParameters)?;
         let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
         let salt = SaltString::generate(&mut OsRng);
