@@ -592,9 +592,10 @@ fn main() {
 ```
 
 The signer can also verify with the key pair it holds, via
-`ed25519_verify_with_key_pair`. Verification returns `Ok(false)` for a valid
-signature over different bytes, and an `Err` only for malformed keys or
-signatures.
+`ed25519_verify_with_key_pair`. Both verify functions use strict verification
+(small-order `R` components and weak public keys are rejected), so they always
+agree. Verification returns `Ok(false)` for a valid signature over different
+bytes, and an `Err` only for malformed keys or signatures.
 
 ```rust
 use cas_lib::signatures::ed25519::{
