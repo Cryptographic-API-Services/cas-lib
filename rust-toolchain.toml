@@ -1,0 +1,5 @@
+# Pin the exact toolchain so CI, releases and local builds compile with the same
+# compiler (#106). rustup installs it on first use. Bump it in its own PR.
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"

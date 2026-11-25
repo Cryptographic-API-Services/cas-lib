@@ -20,8 +20,12 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Install toolchain from rust-toolchain.toml
+      run: rustup toolchain install
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build --release --locked --verbose
     - name: Run tests
-      run: cargo test --release --verbose
+      run: cargo test --release --locked --verbose

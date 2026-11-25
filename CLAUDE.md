@@ -75,9 +75,11 @@ Project Wycheproof vectors are **not** committed. [tests/common/wycheproof.rs](t
 
 Usage examples for every public API live in [docs/EXAMPLES.md](docs/EXAMPLES.md). **Whenever you add, change, or remove a public API (a new algorithm, a new trait method or free function, a changed signature or return type), update the examples in the same change**: add a complete, runnable `fn main()` example for anything new, fix any example that no longer compiles, and keep the Table of Contents in sync. Examples must use the real module paths and handle `CasResult` (e.g. `.unwrap()` or `?`) so they compile when pasted into a fresh crate that depends on `cas-lib`.
 
-### CI
+### CI and releases
 
-- PRs run `cargo build --release` and `cargo test --release` on Linux, Windows, and macOS (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`, `.github/workflows/macos-pr.yml`).
-- Pushes to `main` trigger an automatic `cargo publish` (`.github/workflows/publish-main.yml`).
+- The toolchain is pinned in [rust-toolchain.toml](rust-toolchain.toml); rustup installs it on first use. Every workflow runs cargo with `--locked`, and actions are pinned to commit SHAs (keep the `# vX.Y.Z` comment when bumping one).
+- PRs run `cargo build --release --locked` and `cargo test --release --locked` on Linux, Windows, and macOS (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`, `.github/workflows/macos-pr.yml`).
+- **PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/)** (`.github/workflows/pr-title.yml`). PRs are squash-merged, so the title becomes the commit that release-plz turns into a `CHANGELOG.md` line: `feat:` → Added, `fix:` → Fixed, `security:` → Security, `docs:` → Documentation, anything else → Other. Use `!` (e.g. `feat!:`) for a breaking change.
+- Releases use [release-plz](https://release-plz.dev) (`release-plz.toml`, `.github/workflows/publish-main.yml`). Each push to `main` tests and packages the crate, publishes to crates.io only if the `Cargo.toml` version isn't published yet (then tags `v<version>` and creates a GitHub Release from the `CHANGELOG.md` entry), and opens or updates a release PR that bumps the version and writes the changelog. **Don't bump the version or edit `CHANGELOG.md` by hand in feature PRs**; merge the release PR instead. `publish-main.yml` keeps that name because the crates.io trusted publisher is bound to it.
 
 The dev profile sets `opt-level = 3` for `num-bigint-dig` (used by the RSA crate) to keep RSA key-generation fast during local development.
