@@ -1,8 +1,7 @@
 
 
 use hkdf::Hkdf;
-use rand::rngs::OsRng;
-use sha2::Sha256;
+use sha2_hkdf::Sha256;
 use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
@@ -24,7 +23,7 @@ impl CASKeyExchange for X25519 {
     /// `secret_key` is secret and owned by the caller, who must zeroize it when done
     /// (FFI layers: before freeing it). See the crate-level docs.
     fn generate_secret_and_public_key() -> X25519SecretPublicKeyResult {
-        let secret_key = StaticSecret::random_from_rng(OsRng);
+        let secret_key = StaticSecret::random();
         let public_key = PublicKey::from(&secret_key);
         let result = X25519SecretPublicKeyResult {
             secret_key: secret_key.as_bytes().to_vec(),

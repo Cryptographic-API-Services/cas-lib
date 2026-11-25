@@ -9,7 +9,7 @@ mod symmetric {
     use crate::common::temp_output_path;
     use cas_lib::{key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519}, pqc::{cas_pqc::MlKemKeyPair, ml_kem::{ml_kem_1024_decapsulate, ml_kem_1024_encapsulate, ml_kem_1024_generate}}, symmetric::{aes::CASAES128, cas_symmetric_encryption::{CASAES128AadEncryption, CASAES128Encryption, CASAES256AadEncryption, Chacha20Poly1305Encryption}, chacha20poly1305::CASChacha20Poly1305}};
     use hkdf::Hkdf;
-    use sha2::Sha256;
+    use sha2_hkdf::Sha256;
 
     use super::*;
 

@@ -1,7 +1,15 @@
-use ml_kem::kem::{DecapsulationKey, EncapsulationKey, Encapsulate, Decapsulate};
-use ml_kem::*;
-use rand::rngs::OsRng;
+// The secret keys this module hands out and accepts are the 3168-byte "expanded"
+// decapsulation keys. `ml-kem` 0.3 deprecated that encoding in favour of 64-byte
+// seeds; it is kept here so keys stored by existing callers keep working.
+#![allow(deprecated)]
+
+use ml_kem::{
+    Ciphertext, Decapsulate, Encapsulate, ExpandedDecapsulationKey, ExpandedKeyEncoding, Kem,
+    KeyExport, MlKem1024,
+};
+use ml_kem::ml_kem_1024::{DecapsulationKey, EncapsulationKey};
 use sha3::{Digest, Sha3_256};
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::{CasError, CasResult};
 use crate::pqc::cas_pqc::{MlKemEncapResult, MlKemKeyPair};
@@ -41,12 +49,18 @@ fn decapsulation_key_is_valid(secret_key: &[u8]) -> bool {
 }
 
 /// Generate (secret/decapsulation key, public/encapsulation key)
+///
+/// `secret_key` is the 3168-byte expanded decapsulation key. It is secret and owned by
+/// the caller, who must zeroize it when done (FFI layers: before freeing it).
 pub fn ml_kem_1024_generate() -> MlKemKeyPair {
-    let mut rng = OsRng;
-    let (dk, ek) = MlKem1024::generate(&mut rng);
+    // `DecapsulationKey` zeroizes itself on drop.
+    let (dk, ek) = MlKem1024::generate_keypair();
+    let mut expanded = dk.to_expanded_bytes();
+    let secret_key = expanded.to_vec();
+    expanded.as_mut_slice().zeroize();
     MlKemKeyPair {
-        secret_key: dk.as_bytes().to_vec(),
-        public_key: ek.as_bytes().to_vec(),
+        secret_key,
+        public_key: ek.to_bytes().to_vec(),
     }
 }
 
@@ -61,14 +75,14 @@ pub fn ml_kem_1024_encapsulate(public_key: Vec<u8>) -> CasResult<MlKemEncapResul
     if !encapsulation_key_is_valid(&public_key) {
         return Err(CasError::InvalidKey);
     }
-    let ek_bytes: Encoded<EncapsulationKey<MlKem1024Params>> =
-        public_key.as_slice().try_into().map_err(|_| CasError::InvalidKey)?;
-    let ek = EncapsulationKey::<ml_kem::MlKem1024Params>::from_bytes(&ek_bytes);
-    let mut rng = OsRng;
-    let (ct, ss) = ek.encapsulate(&mut rng).map_err(|_| CasError::EncryptionFailed)?;
+    let ek_bytes = public_key.as_slice().try_into().map_err(|_| CasError::InvalidKey)?;
+    let ek = EncapsulationKey::new(&ek_bytes).map_err(|_| CasError::InvalidKey)?;
+    let (ct, mut ss) = ek.encapsulate();
+    let shared_secret = ss.to_vec();
+    ss.as_mut_slice().zeroize();
     Ok(MlKemEncapResult {
-        ciphertext: ct.as_slice().to_vec(),
-        shared_secret: ss.as_slice().to_vec(),
+        ciphertext: ct.to_vec(),
+        shared_secret,
     })
 }
 
@@ -77,6 +91,7 @@ pub fn ml_kem_1024_encapsulate(public_key: Vec<u8>) -> CasResult<MlKemEncapResul
 /// Returns [`CasError::InvalidKey`] if the key has the wrong length or fails the
 /// FIPS 203 decapsulation key check.
 pub fn ml_kem_1024_decapsulate(secret_key: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>> {
+    let secret_key = Zeroizing::new(secret_key);
     if secret_key.len() != MLKEM1024_SECRET_KEY_LEN {
         return Err(CasError::InvalidKey);
     }
@@ -87,13 +102,17 @@ pub fn ml_kem_1024_decapsulate(secret_key: Vec<u8>, ciphertext: Vec<u8>) -> CasR
         return Err(CasError::InvalidKey);
     }
 
-    let dk_bytes: Encoded<DecapsulationKey<MlKem1024Params>> =
+    let mut dk_bytes: ExpandedDecapsulationKey<MlKem1024> =
         secret_key.as_slice().try_into().map_err(|_| CasError::InvalidKey)?;
-    let dk = DecapsulationKey::<MlKem1024Params>::from_bytes(&dk_bytes);
+    let dk = DecapsulationKey::from_expanded_bytes(&dk_bytes);
+    dk_bytes.as_mut_slice().zeroize();
+    let dk = dk.map_err(|_| CasError::InvalidKey)?;
 
     let ct: Ciphertext<MlKem1024> =
         ciphertext.as_slice().try_into().map_err(|_| CasError::InvalidInput)?;
 
-    let ss = dk.decapsulate(&ct).map_err(|_| CasError::DecryptionFailed)?;
-    Ok(ss.to_vec())
+    let mut ss = dk.decapsulate(&ct);
+    let shared_secret = ss.to_vec();
+    ss.as_mut_slice().zeroize();
+    Ok(shared_secret)
 }

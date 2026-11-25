@@ -9,7 +9,7 @@ mod key_exchange {
     };
     use curve25519_dalek::montgomery::MontgomeryPoint;
     use hkdf::Hkdf;
-    use sha2::Sha256;
+    use sha2_hkdf::Sha256;
 
     fn decode_hex(hex: &str) -> Vec<u8> {
         assert_eq!(hex.len() % 2, 0, "hex input must have an even length");
