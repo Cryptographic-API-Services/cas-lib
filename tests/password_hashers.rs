@@ -35,6 +35,26 @@ mod password_hashers {
     }
 
     #[test]
+    pub fn argon2_memory_cost_overflow_is_rejected() {
+        // memory_cost is in MiB and multiplied by 1024. 4_194_304 * 1024 wraps to 0 and
+        // 4_194_305 * 1024 wraps to 1024 (1 MiB) in release builds; both must be errors,
+        // never a panic or a silently weaker hash.
+        for memory_cost in [4_194_304, 4_194_305, u32::MAX] {
+            assert_eq!(
+                CASArgon::hash_password_parameters(memory_cost, 1, 1, random_password()),
+                Err(CasError::InvalidParameters),
+                "memory_cost {memory_cost} MiB was accepted"
+            );
+        }
+    }
+
+    #[test]
+    pub fn argon2_memory_cost_is_in_mebibytes() {
+        let hash = CASArgon::hash_password_parameters(8, 1, 1, random_password()).unwrap();
+        assert!(hash.contains("m=8192,"), "8 MiB should be stored as m=8192 KiB: {hash}");
+    }
+
+    #[test]
     pub fn argon2_derive_aes_128_and_encrypt() {
         let password = random_password().into_bytes();
         let key = CASArgon::derive_aes_128_key(password).unwrap();
