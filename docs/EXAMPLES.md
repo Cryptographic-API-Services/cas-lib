@@ -536,7 +536,8 @@ fn main() {
 ## Asymmetric (RSA)
 
 The asymmetric module wraps RSA. Keys are PEM-encoded strings. Key sizes below
-2048 bits are rejected. RSA here is used for signing and verifying a document's
+2048 bits are rejected: `generate_rsa_keys` refuses them, and `sign` / `verify`
+return `CasError::InvalidParameters` when given a smaller key's PEM. RSA here is used for signing and verifying a document's
 bytes; every operation returns a `Result`.
 
 ```rust
