@@ -14,7 +14,20 @@ mod password_hashers {
             cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption},
         },
     };
-    
+    use rand::{distributions::Alphanumeric, rngs::OsRng, Rng, RngCore};
+
+    /// A fresh password for tests whose outcome does not depend on its value.
+    fn random_password() -> String {
+        OsRng.sample_iter(&Alphanumeric).take(20).map(char::from).collect()
+    }
+
+    /// A fresh salt of `len` bytes for tests whose outcome does not depend on its value.
+    fn random_salt(len: usize) -> Vec<u8> {
+        let mut salt = vec![0u8; len];
+        OsRng.fill_bytes(&mut salt);
+        salt
+    }
+
     #[test]
     pub fn argon2_hash_with_parameters() {
         let password = "BadPassword".to_string();
@@ -129,7 +142,7 @@ mod password_hashers {
 
     #[test]
     pub fn bcrypt_rejects_73_byte_password_on_verify() {
-        let hash = CASBCrypt::hash_password_customized("DoNotUseThisPassword".to_string(), 4).unwrap();
+        let hash = CASBCrypt::hash_password_customized(random_password(), 4).unwrap();
         assert_eq!(
             CASBCrypt::verify_password(hash, "x".repeat(73)),
             Err(CasError::InvalidParameters)
@@ -175,12 +188,15 @@ mod password_hashers {
     #[test]
     pub fn bcrypt_verifies_hash_created_before_length_check() {
         // Earlier versions of this crate hashed with plain `bcrypt::hash`.
-        let password = "DoNotUseThisPassword".to_string();
+        let password = random_password();
+        let wrong_password = random_password();
+        assert_ne!(password, wrong_password);
         let old_hash = bcrypt::hash(&password, 4).unwrap();
         assert!(CASBCrypt::verify_password(old_hash.clone(), password).unwrap());
-        assert!(!CASBCrypt::verify_password(old_hash, "wrong".to_string()).unwrap());
+        assert!(!CASBCrypt::verify_password(old_hash, wrong_password).unwrap());
 
-        // A hash made elsewhere (Python's bcrypt, from the `bcrypt` crate's tests).
+        // A hash made elsewhere (Python's bcrypt, from the `bcrypt` crate's tests). This is a
+        // known-answer vector, so its password is necessarily hard-coded.
         let python_hash = "$2b$04$EGdrhbKUv8Oc9vGiXX0HQOxSg445d458Muh7DAHskb6QbtCvdxcie".to_string();
         assert!(CASBCrypt::verify_password(python_hash, "correctbatteryhorsestapler".to_string()).unwrap());
     }
@@ -239,14 +255,14 @@ mod password_hashers {
 
     #[test]
     pub fn pbkdf2_accepts_exact_minimums() {
-        let salt = vec![0x5a; pbkdf2::MIN_SALT_LENGTH];
+        let salt = random_salt(pbkdf2::MIN_SALT_LENGTH);
         let key = pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, salt).unwrap();
         assert_eq!(key.len(), 32);
     }
 
     #[test]
     pub fn pbkdf2_rejects_iterations_below_minimum() {
-        let salt = vec![0x5a; pbkdf2::MIN_SALT_LENGTH];
+        let salt = random_salt(pbkdf2::MIN_SALT_LENGTH);
         for iterations in [0, 1, 4_096, pbkdf2::MIN_ITERATIONS - 1] {
             assert_eq!(
                 pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), iterations, salt.clone()),
@@ -264,7 +280,7 @@ mod password_hashers {
     pub fn pbkdf2_rejects_salt_below_minimum() {
         for salt_length in [0, 1, 8, pbkdf2::MIN_SALT_LENGTH - 1] {
             assert_eq!(
-                pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, vec![0x5a; salt_length]),
+                pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, random_salt(salt_length)),
                 Err(CasError::InvalidParameters),
                 "derivation_with_salt accepted a {salt_length}-byte salt"
             );
