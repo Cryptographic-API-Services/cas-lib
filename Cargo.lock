@@ -206,6 +206,7 @@ dependencies = [
  "sha2",
  "sha3",
  "slh-dsa",
+ "subtle",
  "uuid",
  "x25519-dalek",
  "zstd",

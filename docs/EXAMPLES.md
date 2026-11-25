@@ -452,7 +452,8 @@ produces equal output, while two different files produce different output. The
 example below reads two files from disk and demonstrates both the `true`
 (identical content) and `false` (different content) comparison cases described in
 issue #7. `verify_256` / `verify_512` re-hash the data and compare it against a
-previously produced digest.
+previously produced digest in constant time; a digest of the wrong length (for
+example a 64-byte digest passed to `verify_256`, or an empty one) returns `false`.
 
 ```rust
 use std::path::Path;
