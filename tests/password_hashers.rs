@@ -14,7 +14,7 @@ mod password_hashers {
             cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption},
         },
     };
-    use rand::{distributions::Alphanumeric, rngs::OsRng, Rng, RngCore};
+    use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 
     /// A fresh password for tests whose outcome does not depend on its value.
     fn random_password() -> String {
@@ -23,14 +23,12 @@ mod password_hashers {
 
     /// A fresh salt of `len` bytes for tests whose outcome does not depend on its value.
     fn random_salt(len: usize) -> Vec<u8> {
-        let mut salt = vec![0u8; len];
-        OsRng.fill_bytes(&mut salt);
-        salt
+        (0..len).map(|_| OsRng.gen()).collect()
     }
 
     #[test]
     pub fn argon2_hash_with_parameters() {
-        let password = "BadPassword".to_string();
+        let password = random_password();
         let hash = CASArgon::hash_password_parameters(1024, 5, 5, password.clone()).unwrap();
         let verification = CASArgon::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
@@ -38,7 +36,7 @@ mod password_hashers {
 
     #[test]
     pub fn argon2_derive_aes_128_and_encrypt() {
-        let password = b"BadPassword".to_vec(); // do not use this as a password.
+        let password = random_password().into_bytes();
         let key = CASArgon::derive_aes_128_key(password).unwrap();
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
@@ -51,7 +49,7 @@ mod password_hashers {
 
     #[test]
     pub fn argon2_derive_aes_256_and_encrypt() {
-        let password = b"BadPassword".to_vec(); // do not use this as a password.
+        let password = random_password().into_bytes();
         let key = CASArgon::derive_aes_256_key(password).unwrap();
         let nonce = CASAES128::generate_nonce();
         let path = Path::new("tests/test.docx");
@@ -64,7 +62,7 @@ mod password_hashers {
 
     #[test]
     pub fn argon2_hash_password() {
-        let password = "BadPassword".to_string();
+        let password = random_password();
         let hash = CASArgon::hash_password(password.clone()).unwrap();
         let verification = CASArgon::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
@@ -72,7 +70,7 @@ mod password_hashers {
 
     #[test]
     pub fn scrypt_hash_password() {
-        let password = "DoNotUseThisPassword".to_string();
+        let password = random_password();
         let hash = CASScrypt::hash_password(password.clone()).unwrap();
         let verification = CASScrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
@@ -80,7 +78,7 @@ mod password_hashers {
 
     #[test]
     pub fn scrypt_hash_password_customized() {
-        let password = "DoNotUseThisPassword".to_string();
+        let password = random_password();
         let hash = CASScrypt::hash_password_customized(password.clone(), 17, 8, 1).unwrap();
         let verification = CASScrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
@@ -88,7 +86,7 @@ mod password_hashers {
 
     #[test]
     pub fn bcrypt_hash_password() {
-        let password = "DoNotUseThisPassword".to_string();
+        let password = random_password();
         let hash = CASBCrypt::hash_password(password.clone()).unwrap();
         let verification = CASBCrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
@@ -96,7 +94,7 @@ mod password_hashers {
 
     #[test]
     pub fn bcrypt_hash_password_customized() {
-        let password = "DoNotUseThisPassword".to_string();
+        let password = random_password();
         let hash = CASBCrypt::hash_password_customized(password.clone(), 12).unwrap();
         let verification = CASBCrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
@@ -195,10 +193,19 @@ mod password_hashers {
         assert!(CASBCrypt::verify_password(old_hash.clone(), password).unwrap());
         assert!(!CASBCrypt::verify_password(old_hash, wrong_password).unwrap());
 
-        // A hash made elsewhere (Python's bcrypt, from the `bcrypt` crate's tests). This is a
-        // known-answer vector, so its password is necessarily hard-coded.
-        let python_hash = "$2b$04$EGdrhbKUv8Oc9vGiXX0HQOxSg445d458Muh7DAHskb6QbtCvdxcie".to_string();
-        assert!(CASBCrypt::verify_password(python_hash, "correctbatteryhorsestapler".to_string()).unwrap());
+        // Hashes made elsewhere (Python's bcrypt, from the `bcrypt` crate's tests). Known-answer
+        // vectors live in tests/data/, like the other algorithms' test vectors.
+        let vectors = std::fs::read_to_string("tests/data/bcrypt/known_answers.txt").unwrap();
+        let mut checked = 0;
+        for line in vectors.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+            let (password, hash) = line.split_once(' ').expect("each vector is `<password> <hash>`");
+            assert!(
+                CASBCrypt::verify_password(hash.to_string(), password.to_string()).unwrap(),
+                "known-answer hash {hash} did not verify"
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "no bcrypt known-answer vectors found");
     }
 
     fn hex_to_bytes(hex: &str) -> Vec<u8> {
@@ -256,7 +263,7 @@ mod password_hashers {
     #[test]
     pub fn pbkdf2_accepts_exact_minimums() {
         let salt = random_salt(pbkdf2::MIN_SALT_LENGTH);
-        let key = pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, salt).unwrap();
+        let key = pbkdf2::derivation_with_salt(random_password().into_bytes(), pbkdf2::MIN_ITERATIONS, salt).unwrap();
         assert_eq!(key.len(), 32);
     }
 
@@ -265,12 +272,12 @@ mod password_hashers {
         let salt = random_salt(pbkdf2::MIN_SALT_LENGTH);
         for iterations in [0, 1, 4_096, pbkdf2::MIN_ITERATIONS - 1] {
             assert_eq!(
-                pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), iterations, salt.clone()),
+                pbkdf2::derivation_with_salt(random_password().into_bytes(), iterations, salt.clone()),
                 Err(CasError::InvalidParameters),
                 "derivation_with_salt accepted {iterations} iterations"
             );
             assert!(
-                matches!(pbkdf2::derivation(b"BadPassword".to_vec(), iterations), Err(CasError::InvalidParameters)),
+                matches!(pbkdf2::derivation(random_password().into_bytes(), iterations), Err(CasError::InvalidParameters)),
                 "derivation accepted {iterations} iterations"
             );
         }
@@ -280,7 +287,7 @@ mod password_hashers {
     pub fn pbkdf2_rejects_salt_below_minimum() {
         for salt_length in [0, 1, 8, pbkdf2::MIN_SALT_LENGTH - 1] {
             assert_eq!(
-                pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, random_salt(salt_length)),
+                pbkdf2::derivation_with_salt(random_password().into_bytes(), pbkdf2::MIN_ITERATIONS, random_salt(salt_length)),
                 Err(CasError::InvalidParameters),
                 "derivation_with_salt accepted a {salt_length}-byte salt"
             );
@@ -289,7 +296,7 @@ mod password_hashers {
 
     #[test]
     pub fn pbkdf2_derivation_round_trip_reuses_salt() {
-        let password = b"BadPassword".to_vec();
+        let password = random_password().into_bytes();
         let rounds = pbkdf2::MIN_ITERATIONS;
         let result = pbkdf2::derivation(password.clone(), rounds).unwrap();
 
