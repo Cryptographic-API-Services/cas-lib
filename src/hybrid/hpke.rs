@@ -38,13 +38,15 @@ impl CASHybrid for CASHPKE {
         uuid_bytes
     }
 
-    /// Encrypts data using HPKE with the provided public key and info string.
+    /// Encrypts data using HPKE with the provided public key, info string and
+    /// additional authenticated data (`aad`, which may be empty).
     /// Returns the encapsulated key, ciphertext, and tag, or an error if the
     /// public key could not be parsed or encryption failed.
     fn encrypt(
         plaintext: Vec<u8>,
         public_key: Vec<u8>,
         info_str: Vec<u8>,
+        aad: Vec<u8>,
     ) -> CasResult<(Vec<u8>, Vec<u8>, Vec<u8>)> {
         let mut csprng = StdRng::from_entropy();
         let public_key = <Kem as KemTrait>::PublicKey::from_bytes(public_key.as_slice())
@@ -58,7 +60,7 @@ impl CASHybrid for CASHPKE {
         .map_err(|_| CasError::EncryptionFailed)?;
         let mut msg_copy = plaintext;
         let tag = sender_ctx
-            .seal_in_place_detached(&mut msg_copy, b"")
+            .seal_in_place_detached(&mut msg_copy, &aad)
             .map_err(|_| CasError::EncryptionFailed)?;
         let ciphertext = msg_copy;
         Ok((
@@ -68,7 +70,9 @@ impl CASHybrid for CASHPKE {
         ))
     }
 
-    /// Decrypts data using HPKE with the provided private key, encapsulated key, tag, and info string.
+    /// Decrypts data using HPKE with the provided private key, encapsulated key,
+    /// tag, info string and additional authenticated data. `info_str` and `aad`
+    /// must match the values used to encrypt.
     /// Returns the decrypted plaintext, or an error if any input could not be
     /// parsed or decryption failed.
     fn decrypt(
@@ -77,6 +81,7 @@ impl CASHybrid for CASHPKE {
         encapped_key: Vec<u8>,
         tag: Vec<u8>,
         info_str: Vec<u8>,
+        aad: Vec<u8>,
     ) -> CasResult<Vec<u8>> {
         let server_sk = <Kem as KemTrait>::PrivateKey::from_bytes(&private_key)
             .map_err(|_| CasError::InvalidKey)?;
@@ -92,7 +97,7 @@ impl CASHybrid for CASHPKE {
         .map_err(|_| CasError::DecryptionFailed)?;
         let mut ciphertext_copy = ciphertext;
         receiver_ctx
-            .open_in_place_detached(&mut ciphertext_copy, b"", &tag)
+            .open_in_place_detached(&mut ciphertext_copy, &aad, &tag)
             .map_err(|_| CasError::DecryptionFailed)?;
         let plaintext = ciphertext_copy;
         Ok(plaintext)

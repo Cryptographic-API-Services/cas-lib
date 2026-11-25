@@ -61,13 +61,15 @@ pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -
 /// Returns `Ok(true)` if the signature is valid, `Ok(false)` if it is not, and
 /// an error if the key pair or signature has an invalid length.
 /// The key pair is expected to be in byte array format.
+/// Uses strict verification (rejects small-order R and weak keys), exactly
+/// like `ed25519_verify_with_public_key`.
 pub fn ed25519_verify_with_key_pair(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> CasResult<bool> {
     let key_pair_bytes = secret_key_bytes(key_pair)?;
     let signature_bytes: [u8; 64] = signature.try_into().map_err(|_| CasError::InvalidSignature)?;
 
     let keypair = SigningKey::from_bytes(&key_pair_bytes);
     let signature = Signature::from_bytes(&signature_bytes);
-    Ok(keypair.verify(&message, &signature).is_ok())
+    Ok(keypair.verifying_key().verify_strict(&message, &signature).is_ok())
 }
 
 /// Verifies a signature using the provided public key.

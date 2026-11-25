@@ -1,6 +1,6 @@
 
 
-use super::cas_hasher::CASHasher;
+use super::cas_hasher::{digests_match, CASHasher};
 use blake2::{Blake2b512, Blake2s256, Digest};
 
 pub struct CASBlake2;
@@ -21,7 +21,7 @@ impl CASHasher for CASBlake2 {
         let mut hasher = Blake2b512::new();
         hasher.update(data_to_verify);
         let result = hasher.finalize();
-        return hash_to_verify.eq(&result.to_vec());
+        return digests_match(&hash_to_verify, &result);
     }
 
     /// Hashes data using the Blake2s-256 algorithm.
@@ -39,6 +39,6 @@ impl CASHasher for CASBlake2 {
         let mut hasher = Blake2s256::new();
         hasher.update(data_to_verify);
         let result = hasher.finalize();
-        return hash_to_verify.eq(&result.to_vec());
+        return digests_match(&hash_to_verify, &result);
     }
 }

@@ -12,8 +12,10 @@ use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
 
+use super::aead_helpers;
 use super::cas_symmetric_encryption::{
     CASAES128AadEncryption, CASAES128Encryption, CASAES256AadEncryption, CASAES256Encryption,
+    CASAeadSeal,
 };
 
 const AES_NONCE_LEN: usize = 12;
@@ -246,5 +248,35 @@ impl CASAES128Encryption for CASAES128 {
         let mut nonce = [0u8; AES_NONCE_LEN];
         os_rng.fill_bytes(&mut nonce);
         nonce.to_vec()
+    }
+}
+
+impl CASAeadSeal for CASAES256 {
+    const NONCE_LEN: usize = AES_NONCE_LEN;
+
+    /// Encrypts with AES-256-GCM under a fresh random nonce and returns
+    /// `nonce || ciphertext || tag`.
+    fn seal(key: Vec<u8>, plaintext: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::seal::<Aes256Gcm>(&key, &plaintext, aad.as_deref())
+    }
+
+    /// Splits and decrypts a `nonce || ciphertext || tag` blob from [`CASAeadSeal::seal`].
+    fn open(key: Vec<u8>, sealed: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::open::<Aes256Gcm>(&key, &sealed, aad.as_deref())
+    }
+}
+
+impl CASAeadSeal for CASAES128 {
+    const NONCE_LEN: usize = AES_NONCE_LEN;
+
+    /// Encrypts with AES-128-GCM under a fresh random nonce and returns
+    /// `nonce || ciphertext || tag`.
+    fn seal(key: Vec<u8>, plaintext: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::seal::<Aes128Gcm>(&key, &plaintext, aad.as_deref())
+    }
+
+    /// Splits and decrypts a `nonce || ciphertext || tag` blob from [`CASAeadSeal::seal`].
+    fn open(key: Vec<u8>, sealed: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>> {
+        aead_helpers::open::<Aes128Gcm>(&key, &sealed, aad.as_deref())
     }
 }

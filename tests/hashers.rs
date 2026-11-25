@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use cas_lib::hashers::{cas_hasher::CASHasher, sha::CASSHA, sha2::CASSHA2};
+use cas_lib::hashers::{blake2::CASBlake2, cas_hasher::CASHasher, sha::CASSHA, sha2::CASSHA2};
 
 #[cfg(test)]
 mod hashers {
@@ -170,6 +170,31 @@ mod hashers {
         assert_sha3_512_vectors("tests/data/hashers/SHA3_512LongMsg.rsp");
     }
 
+    // Issue #115: `CASSHA` is SHA-3, not SHA-2. Pin the "abc" digests from
+    // FIPS 202 / FIPS 180-4 so the docs naming SHA3-256 / SHA3-512 stay true,
+    // and check that a SHA-2 digest of the same input does not verify.
+    #[test]
+    fn test_cassha_is_sha3_not_sha2() {
+        let data = b"abc".to_vec();
+        let sha3_256 = <CASSHA as CASHasher>::hash_256(data.clone());
+        let sha3_512 = <CASSHA as CASHasher>::hash_512(data.clone());
+        assert_eq!(
+            sha3_256,
+            decode_hex("3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
+        );
+        assert_eq!(
+            sha3_512,
+            decode_hex("b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0")
+        );
+
+        let sha2_256 = <CASSHA2 as CASHasher>::hash_256(data.clone());
+        let sha2_512 = <CASSHA2 as CASHasher>::hash_512(data.clone());
+        assert_ne!(sha3_256, sha2_256);
+        assert_ne!(sha3_512, sha2_512);
+        assert!(!<CASSHA as CASHasher>::verify_256(sha2_256, data.clone()));
+        assert!(!<CASSHA as CASHasher>::verify_512(sha2_512, data));
+    }
+
     #[test]
     fn test_sha2_256_compare_fail() {
         let path = Path::new("tests/test.docx");
@@ -232,5 +257,84 @@ mod hashers {
     #[test]
     fn test_sha2_512_long_msg_rsp_vectors() {
         assert_sha2_512_vectors("tests/data/hashers/SHA512LongMsg.rsp");
+    }
+}
+
+/// Issue #113: every `verify_*` compares digests in constant time and rejects a
+/// digest of the wrong length up front. These tests pin down the accept/reject
+/// behaviour for each of the six verify functions.
+#[cfg(test)]
+mod constant_time_verify {
+    use super::*;
+
+    type HashFn = fn(Vec<u8>) -> Vec<u8>;
+    type VerifyFn = fn(Vec<u8>, Vec<u8>) -> bool;
+
+    fn all_verifiers() -> Vec<(&'static str, HashFn, VerifyFn, usize)> {
+        vec![
+            ("sha3-256", <CASSHA as CASHasher>::hash_256, <CASSHA as CASHasher>::verify_256, 32),
+            ("sha3-512", <CASSHA as CASHasher>::hash_512, <CASSHA as CASHasher>::verify_512, 64),
+            ("sha2-256", <CASSHA2 as CASHasher>::hash_256, <CASSHA2 as CASHasher>::verify_256, 32),
+            ("sha2-512", <CASSHA2 as CASHasher>::hash_512, <CASSHA2 as CASHasher>::verify_512, 64),
+            ("blake2s-256", <CASBlake2 as CASHasher>::hash_256, <CASBlake2 as CASHasher>::verify_256, 32),
+            ("blake2b-512", <CASBlake2 as CASHasher>::hash_512, <CASBlake2 as CASHasher>::verify_512, 64),
+        ]
+    }
+
+    fn data() -> Vec<u8> {
+        b"cas-lib constant-time verify".to_vec()
+    }
+
+    #[test]
+    fn accepts_correct_digest() {
+        for (name, hash, verify, len) in all_verifiers() {
+            let digest = hash(data());
+            assert_eq!(digest.len(), len, "{name}: unexpected digest length");
+            assert!(verify(digest, data()), "{name}: correct digest rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_digest_with_one_byte_changed() {
+        for (name, hash, verify, len) in all_verifiers() {
+            // Flip a byte at the start, middle and end in turn, so a comparison that
+            // only looked at some positions would be caught.
+            for index in [0, len / 2, len - 1] {
+                let mut digest = hash(data());
+                digest[index] ^= 0x01;
+                assert!(
+                    !verify(digest, data()),
+                    "{name}: digest with byte {index} changed was accepted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_digest_of_wrong_length() {
+        for (name, hash, verify, _) in all_verifiers() {
+            let digest = hash(data());
+
+            let mut truncated = digest.clone();
+            truncated.pop();
+            assert!(!verify(truncated, data()), "{name}: truncated digest accepted");
+
+            let mut extended = digest.clone();
+            extended.push(0);
+            assert!(!verify(extended, data()), "{name}: extended digest accepted");
+
+            // A correct prefix of the other output size must not verify either.
+            let mut doubled = digest.clone();
+            doubled.extend_from_slice(&digest);
+            assert!(!verify(doubled, data()), "{name}: doubled digest accepted");
+        }
+    }
+
+    #[test]
+    fn rejects_empty_digest() {
+        for (name, _, verify, _) in all_verifiers() {
+            assert!(!verify(Vec::new(), data()), "{name}: empty digest accepted");
+            assert!(!verify(Vec::new(), Vec::new()), "{name}: empty digest of empty data accepted");
+        }
     }
 }

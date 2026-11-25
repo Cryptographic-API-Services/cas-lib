@@ -40,6 +40,7 @@ pub mod key_exchange {
 }
 
 pub mod symmetric {
+    pub(crate) mod aead_helpers;
     pub mod aes;
     pub mod aes_gcm_siv;
     pub mod aes_kw;
