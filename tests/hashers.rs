@@ -170,6 +170,31 @@ mod hashers {
         assert_sha3_512_vectors("tests/data/hashers/SHA3_512LongMsg.rsp");
     }
 
+    // Issue #115: `CASSHA` is SHA-3, not SHA-2. Pin the "abc" digests from
+    // FIPS 202 / FIPS 180-4 so the docs naming SHA3-256 / SHA3-512 stay true,
+    // and check that a SHA-2 digest of the same input does not verify.
+    #[test]
+    fn test_cassha_is_sha3_not_sha2() {
+        let data = b"abc".to_vec();
+        let sha3_256 = <CASSHA as CASHasher>::hash_256(data.clone());
+        let sha3_512 = <CASSHA as CASHasher>::hash_512(data.clone());
+        assert_eq!(
+            sha3_256,
+            decode_hex("3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
+        );
+        assert_eq!(
+            sha3_512,
+            decode_hex("b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0")
+        );
+
+        let sha2_256 = <CASSHA2 as CASHasher>::hash_256(data.clone());
+        let sha2_512 = <CASSHA2 as CASHasher>::hash_512(data.clone());
+        assert_ne!(sha3_256, sha2_256);
+        assert_ne!(sha3_512, sha2_512);
+        assert!(!<CASSHA as CASHasher>::verify_256(sha2_256, data.clone()));
+        assert!(!<CASSHA as CASHasher>::verify_512(sha2_512, data));
+    }
+
     #[test]
     fn test_sha2_256_compare_fail() {
         let path = Path::new("tests/test.docx");

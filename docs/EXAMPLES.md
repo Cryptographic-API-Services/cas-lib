@@ -446,9 +446,13 @@ fn main() {
 
 ## Hashers
 
-The hashers module provides SHA-2 / SHA-3 style digests (256- and 512-bit) via
-the `CASHasher` trait. A digest is deterministic, so hashing the same file twice
-produces equal output, while two different files produce different output. The
+The hashers module provides SHA-3, SHA-2 and BLAKE2 digests (256- and 512-bit)
+via the `CASHasher` trait. The example below uses `CASSHA`, which is SHA-3
+(FIPS 202): `hash_256` / `verify_256` use SHA3-256 and `hash_512` / `verify_512`
+use SHA3-512. These are not SHA-256 / SHA-512, so a `CASSHA` digest will not
+match a SHA-2 digest of the same data. A digest is deterministic, so hashing the
+same file twice produces equal output, while two different files produce
+different output. The
 example below reads two files from disk and demonstrates both the `true`
 (identical content) and `false` (different content) comparison cases described in
 issue #7. `verify_256` / `verify_512` re-hash the data and compare it against a
@@ -463,7 +467,7 @@ fn main() {
     // Hash the first file.
     let path = Path::new("file_a.docx");
     let file_a: Vec<u8> = std::fs::read(path).unwrap();
-    let hash_a = <CASSHA as CASHasher>::hash_256(file_a.clone());
+    let hash_a = <CASSHA as CASHasher>::hash_256(file_a.clone()); // SHA3-256
 
     // Hashing the SAME file again yields the SAME digest -> true.
     let hash_a_again = <CASSHA as CASHasher>::hash_256(file_a.clone());
@@ -479,7 +483,7 @@ fn main() {
     let verified = <CASSHA as CASHasher>::verify_256(hash_a, file_a);
     println!("verify_256: {}", verified); // true
 
-    // 512-bit variants are also available:
+    // SHA3-512 variants are also available:
     //   <CASSHA as CASHasher>::hash_512(data);
     //   <CASSHA as CASHasher>::verify_512(digest, data);
 }
