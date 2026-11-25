@@ -4,10 +4,10 @@ mod password_hashers {
     use cas_lib::{
         error::CasError,
         password_hashers::{
-            argon2::CASArgon,
-            bcrypt::{CASBCrypt, BCRYPT_MAX_PASSWORD_BYTES},
+            argon2::{self, CASArgon},
+            bcrypt::{CASBCrypt, BCRYPT_MAX_COST, BCRYPT_MAX_PASSWORD_BYTES, BCRYPT_MIN_COST},
             pbkdf2,
-            scrypt::CASScrypt,
+            scrypt::{self, CASScrypt},
         },
         symmetric::{
             aes::{CASAES128, CASAES256},
@@ -32,6 +32,89 @@ mod password_hashers {
         let hash = CASArgon::hash_password_parameters(1024, 5, 5, password.clone()).unwrap();
         let verification = CASArgon::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
+    }
+
+    #[test]
+    pub fn argon2_memory_cost_overflow_is_rejected() {
+        // memory_cost is in MiB and multiplied by 1024. 4_194_304 * 1024 wraps to 0 and
+        // 4_194_305 * 1024 wraps to 1024 (1 MiB) in release builds; both must be errors,
+        // never a panic or a silently weaker hash.
+        for memory_cost in [4_194_304, 4_194_305, u32::MAX] {
+            assert_eq!(
+                CASArgon::hash_password_parameters(memory_cost, 1, 1, random_password()),
+                Err(CasError::InvalidParameters),
+                "memory_cost {memory_cost} MiB was accepted"
+            );
+        }
+    }
+
+    #[test]
+    pub fn argon2_memory_cost_is_in_mebibytes() {
+        let hash = CASArgon::hash_password_parameters(19, 1, 1, random_password()).unwrap();
+        assert!(hash.contains("m=19456,"), "19 MiB should be stored as m=19456 KiB: {hash}");
+    }
+
+    #[test]
+    pub fn argon2_rejects_parameters_outside_bounds() {
+        let cases = [
+            (argon2::MIN_MEMORY_COST_MIB - 1, 1, 1),
+            (argon2::MAX_MEMORY_COST_MIB + 1, 1, 1),
+            (argon2::MIN_MEMORY_COST_MIB, 0, 1),
+            (argon2::MIN_MEMORY_COST_MIB, argon2::MAX_ITERATIONS + 1, 1),
+            (argon2::MIN_MEMORY_COST_MIB, 1, 0),
+            (argon2::MIN_MEMORY_COST_MIB, 1, argon2::MAX_PARALLELISM + 1),
+        ];
+        for (m, t, p) in cases {
+            assert_eq!(
+                CASArgon::hash_password_parameters(m, t, p, random_password()),
+                Err(CasError::InvalidParameters),
+                "accepted m={m} MiB, t={t}, p={p}"
+            );
+        }
+    }
+
+    #[test]
+    pub fn argon2_bounds_are_documented_values() {
+        assert_eq!(
+            (argon2::MIN_MEMORY_COST_MIB, argon2::MAX_MEMORY_COST_MIB),
+            (19, 4096)
+        );
+        assert_eq!((argon2::MIN_ITERATIONS, argon2::MAX_ITERATIONS), (1, 10));
+        assert_eq!((argon2::MIN_PARALLELISM, argon2::MAX_PARALLELISM), (1, 16));
+    }
+
+    #[test]
+    pub fn argon2_verify_rejects_hashes_over_the_bounds_before_hashing() {
+        // A stored hash chooses its own cost. These would ask for 4 TiB of memory, a
+        // huge iteration count or parallelism; verify must refuse them up front.
+        let salt = "c29tZXNhbHRzb21lc2FsdA";
+        let digest = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        for params in [
+            format!("m={},t=1,p=1", (argon2::MAX_MEMORY_COST_MIB + 1) * 1024),
+            format!("m=19456,t={},p=1", argon2::MAX_ITERATIONS + 1),
+            format!("m=19456,t=1,p={}", argon2::MAX_PARALLELISM + 1),
+            "m=4294967295,t=4294967295,p=255".to_string(),
+        ] {
+            let hostile = format!("$argon2id$v=19${params}${salt}${digest}");
+            assert_eq!(
+                CASArgon::verify_password(hostile.clone(), random_password()),
+                Err(CasError::InvalidParameters),
+                "verified {hostile}"
+            );
+        }
+    }
+
+    #[test]
+    pub fn argon2_verify_still_accepts_hashes_below_the_hashing_minimums() {
+        // Older hashes may use less memory than MIN_MEMORY_COST_MIB; they must verify.
+        use ::argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString}, Algorithm, Argon2, Params, Version};
+        let password = random_password();
+        let weak = Argon2::new(Algorithm::Argon2id, Version::V0x13, Params::new(8 * 1024, 1, 1, None).unwrap())
+            .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
+            .unwrap()
+            .to_string();
+        assert!(CASArgon::verify_password(weak.clone(), password).unwrap());
+        assert!(!CASArgon::verify_password(weak, random_password()).unwrap());
     }
 
     #[test]
@@ -85,6 +168,84 @@ mod password_hashers {
     }
 
     #[test]
+    pub fn scrypt_rejects_parameters_outside_bounds() {
+        let cases = [
+            (scrypt::MIN_LOG_N - 1, 8, 1),
+            (scrypt::MAX_LOG_N + 1, 8, 1),
+            (40, 8, 1), // 128 PiB, from the issue
+            (scrypt::MIN_LOG_N, 0, 1),
+            (scrypt::MIN_LOG_N, scrypt::MAX_BLOCK_SIZE + 1, 1),
+            (scrypt::MIN_LOG_N, 8, 0),
+            (scrypt::MIN_LOG_N, 8, scrypt::MAX_PARALLELISM + 1),
+        ];
+        for (log_n, r, p) in cases {
+            assert_eq!(
+                CASScrypt::hash_password_customized(random_password(), log_n, r, p),
+                Err(CasError::InvalidParameters),
+                "accepted log_n={log_n}, r={r}, p={p}"
+            );
+        }
+    }
+
+    #[test]
+    pub fn scrypt_accepts_the_bounds_themselves() {
+        let password = random_password();
+        let hash = CASScrypt::hash_password_customized(password.clone(), scrypt::MIN_LOG_N, 1, 1).unwrap();
+        assert!(CASScrypt::verify_password(hash, password).unwrap());
+        assert_eq!((scrypt::MIN_LOG_N, scrypt::MAX_LOG_N), (10, 20));
+        assert_eq!((scrypt::MAX_BLOCK_SIZE, scrypt::MAX_PARALLELISM), (32, 16));
+    }
+
+    #[test]
+    pub fn scrypt_verify_rejects_hashes_over_the_bounds_before_hashing() {
+        let salt = "c29tZXNhbHRzb21lc2FsdA";
+        let digest = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        for params in [
+            format!("ln={},r=8,p=1", scrypt::MAX_LOG_N + 1),
+            format!("ln=17,r={},p=1", scrypt::MAX_BLOCK_SIZE + 1),
+            format!("ln=17,r=8,p={}", scrypt::MAX_PARALLELISM + 1),
+            "ln=40,r=8,p=1".to_string(),
+        ] {
+            let hostile = format!("$scrypt${params}${salt}${digest}");
+            assert_eq!(
+                CASScrypt::verify_password(hostile.clone(), random_password()),
+                Err(CasError::InvalidParameters),
+                "verified {hostile}"
+            );
+        }
+    }
+
+    #[test]
+    pub fn bcrypt_rejects_costs_outside_bounds() {
+        for cost in [0, 4, BCRYPT_MIN_COST - 1, BCRYPT_MAX_COST + 1, 31] {
+            assert_eq!(
+                CASBCrypt::hash_password_customized(random_password(), cost),
+                Err(CasError::InvalidParameters),
+                "accepted cost {cost}"
+            );
+        }
+        assert_eq!((BCRYPT_MIN_COST, BCRYPT_MAX_COST), (10, 16));
+    }
+
+    #[test]
+    pub fn bcrypt_verify_rejects_costs_over_the_maximum_before_hashing() {
+        // A $2b$31$ hash would take hours to check. It must be refused immediately.
+        let hostile = format!(
+            "$2b${:02}$EGdrhbKUv8Oc9vGiXX0HQOxSg445d458Muh7DAHskb6QbtCvdxcie",
+            BCRYPT_MAX_COST + 1
+        );
+        assert_eq!(
+            CASBCrypt::verify_password(hostile, random_password()),
+            Err(CasError::InvalidParameters)
+        );
+        let hours = "$2b$31$EGdrhbKUv8Oc9vGiXX0HQOxSg445d458Muh7DAHskb6QbtCvdxcie".to_string();
+        assert_eq!(
+            CASBCrypt::verify_password(hours, random_password()),
+            Err(CasError::InvalidParameters)
+        );
+    }
+
+    #[test]
     pub fn bcrypt_hash_password() {
         let password = random_password();
         let hash = CASBCrypt::hash_password(password.clone()).unwrap();
@@ -104,7 +265,7 @@ mod password_hashers {
     pub fn bcrypt_accepts_72_byte_password() {
         let password = "x".repeat(BCRYPT_MAX_PASSWORD_BYTES);
         assert_eq!(password.len(), 72);
-        let hash = CASBCrypt::hash_password_customized(password.clone(), 4).unwrap();
+        let hash = CASBCrypt::hash_password_customized(password.clone(), BCRYPT_MIN_COST).unwrap();
         assert!(CASBCrypt::verify_password(hash.clone(), password).unwrap());
         // Changing the last of the 72 bytes changes the result: no byte is dropped.
         let last_byte_differs = format!("{}y", "x".repeat(71));
@@ -116,7 +277,7 @@ mod password_hashers {
         // 24 three-byte characters: 24 chars, 72 bytes.
         let password = "€".repeat(24);
         assert_eq!(password.len(), 72);
-        let hash = CASBCrypt::hash_password_customized(password.clone(), 4).unwrap();
+        let hash = CASBCrypt::hash_password_customized(password.clone(), BCRYPT_MIN_COST).unwrap();
         assert!(CASBCrypt::verify_password(hash, password).unwrap());
     }
 
@@ -128,19 +289,19 @@ mod password_hashers {
             Err(CasError::InvalidParameters)
         );
         assert_eq!(
-            CASBCrypt::hash_password_customized(password, 4),
+            CASBCrypt::hash_password_customized(password, BCRYPT_MIN_COST),
             Err(CasError::InvalidParameters)
         );
         // The limit is in bytes: 25 three-byte characters is 75 bytes.
         assert_eq!(
-            CASBCrypt::hash_password_customized("€".repeat(25), 4),
+            CASBCrypt::hash_password_customized("€".repeat(25), BCRYPT_MIN_COST),
             Err(CasError::InvalidParameters)
         );
     }
 
     #[test]
     pub fn bcrypt_rejects_73_byte_password_on_verify() {
-        let hash = CASBCrypt::hash_password_customized(random_password(), 4).unwrap();
+        let hash = CASBCrypt::hash_password_customized(random_password(), BCRYPT_MIN_COST).unwrap();
         assert_eq!(
             CASBCrypt::verify_password(hash, "x".repeat(73)),
             Err(CasError::InvalidParameters)
@@ -155,12 +316,12 @@ mod password_hashers {
 
         // Neither long password can be hashed, so they cannot collide.
         assert_eq!(
-            CASBCrypt::hash_password_customized(first, 4),
+            CASBCrypt::hash_password_customized(first, BCRYPT_MIN_COST),
             Err(CasError::InvalidParameters)
         );
 
         // A long password no longer verifies against a hash of its first 72 bytes.
-        let prefix_hash = CASBCrypt::hash_password_customized(prefix.clone(), 4).unwrap();
+        let prefix_hash = CASBCrypt::hash_password_customized(prefix.clone(), BCRYPT_MIN_COST).unwrap();
         assert!(CASBCrypt::verify_password(prefix_hash.clone(), prefix).unwrap());
         assert_eq!(
             CASBCrypt::verify_password(prefix_hash, second),

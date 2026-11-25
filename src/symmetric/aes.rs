@@ -1,16 +1,16 @@
 use aes_gcm::{Key};
 
-use hkdf::Hkdf;
 use rand::{RngCore, rngs::OsRng};
 
 use aes_gcm::{
     aead::{Aead, Payload},
     Aes128Gcm, Aes256Gcm, KeyInit, Nonce,
 };
-use sha2::Sha256;
-use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
+use crate::key_exchange::x25519::{
+    derive_key_from_x25519_shared_secret, KDF_LABEL_AES_128_GCM, KDF_LABEL_AES_256_GCM,
+};
 
 use super::aead_helpers;
 use super::cas_symmetric_encryption::{
@@ -77,18 +77,21 @@ impl CASAES256Encryption for CASAES256 {
             .map_err(|_| CasError::DecryptionFailed)
     }
 
-    /// Creates an AES-256 key 32-byte key from an X25519 Shared Secret
+    /// Derives a 256-bit AES-256-GCM key from an X25519 shared secret with HKDF-SHA256.
+    ///
+    /// Pass the shared secret from `X25519::diffie_hellman` and **both** parties' public
+    /// keys, in either order. The key is bound to AES-256-GCM and to those public keys, so a
+    /// shared secret used for several ciphers yields unrelated keys, and both peers
+    /// derive the same key only if they saw the same public keys.
+    ///
+    /// Returns [`CasError::InvalidKey`] if any input is not 32 bytes or the shared secret
+    /// is all zeros. Keys derived by cas-lib 0.4 and earlier (one HKDF `info` for every
+    /// cipher, no public keys) are different; both peers must use the same version.
     ///
     /// The returned key is secret and owned by the caller, who must zeroize it when done
     /// (FFI layers: before freeing it). See the crate-level docs.
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>> {
-        let shared_secret = Zeroizing::new(shared_secret);
-        let hk = Hkdf::<Sha256>::new(None, &shared_secret);
-        let mut aes_key = Zeroizing::new(vec![0u8; 32]);
-        hk.expand(b"aes key", &mut aes_key)
-            .map_err(|_| CasError::KeyGenerationFailed)?;
-        // Hand the buffer to the caller without leaving an unzeroed copy behind.
-        Ok(std::mem::take(&mut *aes_key))
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>> {
+        derive_key_from_x25519_shared_secret(shared_secret, public_key_a, public_key_b, KDF_LABEL_AES_256_GCM, 32)
     }
 
 
@@ -227,18 +230,21 @@ impl CASAES128Encryption for CASAES128 {
 
 
 
-    /// Generates an AES-128 16-byte key from an X25519 shared secret
+    /// Derives a 128-bit AES-128-GCM key from an X25519 shared secret with HKDF-SHA256.
+    ///
+    /// Pass the shared secret from `X25519::diffie_hellman` and **both** parties' public
+    /// keys, in either order. The key is bound to AES-128-GCM and to those public keys, so a
+    /// shared secret used for several ciphers yields unrelated keys, and both peers
+    /// derive the same key only if they saw the same public keys.
+    ///
+    /// Returns [`CasError::InvalidKey`] if any input is not 32 bytes or the shared secret
+    /// is all zeros. Keys derived by cas-lib 0.4 and earlier (one HKDF `info` for every
+    /// cipher, no public keys) are different; both peers must use the same version.
     ///
     /// The returned key is secret and owned by the caller, who must zeroize it when done
     /// (FFI layers: before freeing it). See the crate-level docs.
-    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>) -> CasResult<Vec<u8>> {
-        let shared_secret = Zeroizing::new(shared_secret);
-        let hk = Hkdf::<Sha256>::new(None, &shared_secret);
-        let mut aes_key = Zeroizing::new(vec![0u8; 16]);
-        hk.expand(b"aes key", &mut aes_key)
-            .map_err(|_| CasError::KeyGenerationFailed)?;
-        // Hand the buffer to the caller without leaving an unzeroed copy behind.
-        Ok(std::mem::take(&mut *aes_key))
+    fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>> {
+        derive_key_from_x25519_shared_secret(shared_secret, public_key_a, public_key_b, KDF_LABEL_AES_128_GCM, 16)
     }
 
 

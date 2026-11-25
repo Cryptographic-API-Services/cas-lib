@@ -149,22 +149,24 @@ mod zeroize_tests {
     #[test]
     fn hkdf_aes_keys_unchanged_by_zeroization() {
         let shared_secret = vec![7u8; 32];
+        let pk_a = vec![1u8; 32];
+        let pk_b = vec![2u8; 32];
 
-        let k256 = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(shared_secret.clone()).unwrap();
-        let k128 = <CASAES128 as CASAES128Encryption>::key_from_x25519_shared_secret(shared_secret.clone()).unwrap();
-        let s256 = <CASAES256SIV as CASAES256SIVEncryption>::key_from_x25519_shared_secret(shared_secret.clone()).unwrap();
-        let s128 = <CASAES128SIV as CASAES128SIVEncryption>::key_from_x25519_shared_secret(shared_secret.clone()).unwrap();
+        let k256 = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(shared_secret.clone(), pk_a.clone(), pk_b.clone()).unwrap();
+        let k128 = <CASAES128 as CASAES128Encryption>::key_from_x25519_shared_secret(shared_secret.clone(), pk_a.clone(), pk_b.clone()).unwrap();
+        let s256 = <CASAES256SIV as CASAES256SIVEncryption>::key_from_x25519_shared_secret(shared_secret.clone(), pk_a.clone(), pk_b.clone()).unwrap();
+        let s128 = <CASAES128SIV as CASAES128SIVEncryption>::key_from_x25519_shared_secret(shared_secret.clone(), pk_a.clone(), pk_b.clone()).unwrap();
 
         assert_eq!(k256.len(), 32);
         assert_eq!(k128.len(), 16);
-        // HKDF-SHA256 with the same IKM and info: the 16-byte key is a prefix of the 32-byte one.
-        assert_eq!(&k256[..16], k128.as_slice());
-        assert_eq!(k256, s256);
-        assert_eq!(k128, s128);
-        assert!(k256.iter().any(|&b| b != 0), "derived key must not be the zeroed buffer");
+        assert_eq!(s256.len(), 32);
+        assert_eq!(s128.len(), 16);
+        for key in [&k256, &k128, &s256, &s128] {
+            assert!(key.iter().any(|&b| b != 0), "derived key must not be the zeroed buffer");
+        }
 
         // Deterministic for the same input.
-        let again = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(shared_secret).unwrap();
+        let again = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(shared_secret, pk_a, pk_b).unwrap();
         assert_eq!(k256, again);
     }
 

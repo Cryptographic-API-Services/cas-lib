@@ -1,6 +1,8 @@
 
 
-use bcrypt::{hash, verify, DEFAULT_COST};
+use std::str::FromStr;
+
+use bcrypt::{hash, verify, HashParts, DEFAULT_COST};
 
 use crate::error::{CasError, CasResult};
 
@@ -11,6 +13,13 @@ use crate::error::{CasError, CasResult};
 /// the same hash. They are now rejected with [`CasError::InvalidParameters`].
 /// The limit counts UTF-8 bytes, not characters.
 pub const BCRYPT_MAX_PASSWORD_BYTES: usize = 72;
+
+/// The smallest cost [`CASBCrypt::hash_password_customized`] accepts.
+pub const BCRYPT_MIN_COST: u32 = 10;
+/// The largest cost accepted when hashing or found in a stored hash being verified.
+/// Each step doubles the work; 16 is already about 64× the default (12), and the
+/// bcrypt maximum of 31 is hours of CPU in one call.
+pub const BCRYPT_MAX_COST: u32 = 16;
 
 pub struct CASBCrypt;
 
@@ -34,12 +43,16 @@ impl CASBCrypt {
     /// Parameters:
     /// - password_to_hash: The password to be hashed, at most
     ///   [`BCRYPT_MAX_PASSWORD_BYTES`] (72) bytes of UTF-8.
-    /// - cost: The cost parameter for bcrypt (default is 12 and max is 31).
+    /// - cost: The cost parameter, from [`BCRYPT_MIN_COST`] (10) to
+    ///   [`BCRYPT_MAX_COST`] (16). The default used by [`Self::hash_password`] is 12.
     /// Returns the hashed password as a string.
     ///
-    /// Returns [`CasError::InvalidParameters`] if the password is longer than
-    /// 72 bytes; it is never truncated.
+    /// Returns [`CasError::InvalidParameters`] if the cost is outside that range or the
+    /// password is longer than 72 bytes; it is never truncated.
     pub fn hash_password_customized(password_to_hash: String, cost: u32) -> CasResult<String> {
+        if !(BCRYPT_MIN_COST..=BCRYPT_MAX_COST).contains(&cost) {
+            return Err(CasError::InvalidParameters);
+        }
         Self::check_password_length(&password_to_hash)?;
         hash(password_to_hash, cost).map_err(|_| CasError::PasswordHashingFailed)
     }
@@ -63,7 +76,16 @@ impl CASBCrypt {
     /// match a hash of its first 72 bytes, and [`CasError::PasswordHashingFailed`]
     /// if the stored hash could not be parsed. Hashes of passwords up to 72 bytes
     /// created by earlier versions of this crate still verify.
+    ///
+    /// The cost comes from the stored hash, so it is checked first: a hash with a
+    /// cost above [`BCRYPT_MAX_COST`] returns [`CasError::InvalidParameters`] instead
+    /// of running for hours. Costs below [`BCRYPT_MIN_COST`] still verify, so older
+    /// hashes keep working.
     pub fn verify_password(hashed_password: String, password_to_verify: String) -> CasResult<bool> {
+        let parts = HashParts::from_str(&hashed_password).map_err(|_| CasError::PasswordHashingFailed)?;
+        if parts.get_cost() > BCRYPT_MAX_COST {
+            return Err(CasError::InvalidParameters);
+        }
         Self::check_password_length(&password_to_verify)?;
         verify(password_to_verify, &hashed_password).map_err(|_| CasError::PasswordHashingFailed)
     }
