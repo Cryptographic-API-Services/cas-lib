@@ -656,26 +656,54 @@ fn main() {
 
 Every AES type also offers `key_from_vec`, which validates an existing key
 (returning `CasError::InvalidKey` on the wrong length), and
-`key_from_x25519_shared_secret`, which runs HKDF-SHA256 over an
-[X25519](#key-exchange-x25519) shared secret to produce a key of the right size.
-This is how two parties turn a key exchange into a shared encryption key.
+`key_from_x25519_shared_secret`, which derives a key of the right size from an
+[X25519](#key-exchange-x25519) shared secret with HKDF-SHA256. This is how two
+parties turn a key exchange into a shared encryption key.
+
+`key_from_x25519_shared_secret(shared_secret, public_key_a, public_key_b)` takes
+the shared secret and **both** parties' 32-byte public keys, in either order (they
+are sorted internally, so each side can pass its own key first). The HKDF `info`
+is `"cas-lib/v1/x25519-hkdf-sha256/<cipher>" || 0x00 || min(pk_a, pk_b) || max(pk_a, pk_b)`,
+so:
+
+- the key is bound to the cipher and key size: the AES-128 key is not a prefix of
+  the AES-256 key, and AES-GCM and AES-GCM-SIV keys from one secret are unrelated;
+- the key is bound to the public keys: both peers get the same key only if they
+  saw the same two public keys.
+
+It returns `CasError::InvalidKey` if any input is not 32 bytes or the shared
+secret is all zeros. Keys derived by cas-lib 0.4 and earlier are different, so
+both peers must upgrade together.
+
+If you don't need to manage the exchange yourself, [HPKE](#hybrid-hpke) does the
+key exchange, key derivation and encryption in one step, with standard (RFC 9180)
+domain separation.
 
 ```rust
 use cas_lib::key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519};
 use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
 
 fn main() {
-    // Alice and Bob agree on a shared secret.
+    // Alice and Bob exchange public keys and agree on a shared secret.
     let alice = X25519::generate_secret_and_public_key();
     let bob = X25519::generate_secret_and_public_key();
-    let alice_shared = X25519::diffie_hellman(alice.secret_key, bob.public_key).unwrap();
-    let bob_shared = X25519::diffie_hellman(bob.secret_key, alice.public_key).unwrap();
+    let alice_shared = X25519::diffie_hellman(alice.secret_key, bob.public_key.clone()).unwrap();
+    let bob_shared = X25519::diffie_hellman(bob.secret_key, alice.public_key.clone()).unwrap();
 
-    // Each side derives the same AES-256 key from it.
-    let alice_key =
-        <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(alice_shared).unwrap();
-    let bob_key =
-        <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(bob_shared).unwrap();
+    // Each side derives the same AES-256 key, passing both public keys (own key
+    // first here; the order doesn't matter).
+    let alice_key = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(
+        alice_shared,
+        alice.public_key.clone(),
+        bob.public_key.clone(),
+    )
+    .unwrap();
+    let bob_key = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(
+        bob_shared,
+        bob.public_key,
+        alice.public_key,
+    )
+    .unwrap();
     assert_eq!(alice_key, bob_key);
 
     // Alice encrypts, Bob decrypts. The nonce travels alongside the ciphertext.
@@ -938,11 +966,20 @@ fn main() {
 
 The key_exchange module implements X25519 Diffie-Hellman. Each party generates a
 secret/public key pair; combining your secret key with the other party's public
-key yields a shared secret that is identical on both sides. That shared secret
-can then be turned into a symmetric key (see
-[`key_from_x25519_shared_secret`](#symmetric) on the AES types).
+key yields a shared secret that is identical on both sides.
+
+`diffie_hellman` returns `CasError::InvalidKey` if either key is not 32 bytes, or
+if the other party's public key is a low-order point. Such a key forces the
+all-zero shared secret whatever your secret key is, so an attacker who sends one
+would know the "shared" secret; the exchange fails instead.
+
+Don't use the shared secret as a key directly. Turn it into a symmetric key with
+[`key_from_x25519_shared_secret`](#importing-and-deriving-aes-keys) on the AES
+types, which binds the key to the cipher and to both public keys, or use
+[HPKE](#hybrid-hpke), which does the exchange, derivation and encryption together.
 
 ```rust
+use cas_lib::error::CasError;
 use cas_lib::key_exchange::{
     cas_key_exchange::CASKeyExchange,
     x25519::{X25519, X25519SecretPublicKeyResult},
@@ -959,6 +996,15 @@ fn main() {
 
     // Both sides derive the SAME shared secret -> true.
     println!("shared secrets match: {}", alice_shared == bob_shared); // true
+
+    // A low-order public key (here u = 0) is rejected rather than yielding the
+    // all-zero shared secret.
+    let me = X25519::generate_secret_and_public_key();
+    let low_order_key = vec![0u8; 32];
+    assert_eq!(
+        X25519::diffie_hellman(me.secret_key, low_order_key),
+        Err(CasError::InvalidKey)
+    );
 }
 ```
 

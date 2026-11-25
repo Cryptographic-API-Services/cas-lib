@@ -259,16 +259,20 @@ mod aes_gcm_siv {
         let alice = <X25519 as CASKeyExchange>::generate_secret_and_public_key();
 
         let bob_shared_secret =
-            <X25519 as CASKeyExchange>::diffie_hellman(bob.secret_key, alice.public_key).unwrap();
+            <X25519 as CASKeyExchange>::diffie_hellman(bob.secret_key, alice.public_key.clone())
+                .unwrap();
         let alice_shared_secret =
-            <X25519 as CASKeyExchange>::diffie_hellman(alice.secret_key, bob.public_key).unwrap();
+            <X25519 as CASKeyExchange>::diffie_hellman(alice.secret_key, bob.public_key.clone())
+                .unwrap();
 
         let nonce = <CASAES256SIV as CASAES256SIVEncryption>::generate_nonce();
         let path = Path::new("tests/test.docx");
         let file_bytes: Vec<u8> = std::fs::read(path).unwrap();
 
         let alice_key = <CASAES256SIV as CASAES256SIVEncryption>::key_from_x25519_shared_secret(
-            bob_shared_secret,
+            alice_shared_secret,
+            alice.public_key.clone(),
+            bob.public_key.clone(),
         )
         .unwrap();
         let encrypted_bytes = <CASAES256SIV as CASAES256SIVEncryption>::encrypt_plaintext(
@@ -278,8 +282,11 @@ mod aes_gcm_siv {
         )
         .unwrap();
 
+        // Bob passes the public keys in the other order and still derives the same key.
         let bob_key = <CASAES256SIV as CASAES256SIVEncryption>::key_from_x25519_shared_secret(
-            alice_shared_secret,
+            bob_shared_secret,
+            bob.public_key,
+            alice.public_key,
         )
         .unwrap();
         let decrypted_bytes = <CASAES256SIV as CASAES256SIVEncryption>::decrypt_ciphertext(
