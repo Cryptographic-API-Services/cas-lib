@@ -287,24 +287,28 @@ mod aes_kw {
 
     #[test]
     fn wrap_key_rejects_invalid_kek_length() {
+        // Random KEKs of the wrong size (CodeQL flags literal keys, even in tests).
+        let kek_16 = <CASAES128KW as CASAES128KeyWrap>::generate_kek();
+        let kek_32 = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
+        let kek_24 = kek_32[..24].to_vec();
         let key_data = vec![0u8; 16];
         assert_eq!(
-            <CASAES256KW as CASAES256KeyWrap>::wrap_key(vec![0u8; 16], key_data.clone()),
+            <CASAES256KW as CASAES256KeyWrap>::wrap_key(kek_16, key_data.clone()),
             Err(CasError::InvalidKey)
         );
         assert_eq!(
-            <CASAES128KW as CASAES128KeyWrap>::wrap_key(vec![0u8; 32], key_data.clone()),
+            <CASAES128KW as CASAES128KeyWrap>::wrap_key(kek_32, key_data.clone()),
             Err(CasError::InvalidKey)
         );
         assert_eq!(
-            <CASAES256KW as CASAES256KeyWrap>::wrap_key_with_padding(vec![0u8; 24], key_data),
+            <CASAES256KW as CASAES256KeyWrap>::wrap_key_with_padding(kek_24, key_data),
             Err(CasError::InvalidKey)
         );
     }
 
     #[test]
     fn wrap_key_rejects_invalid_key_data_length() {
-        let kek = vec![0u8; 32];
+        let kek = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
         // NIST SP 800-38F: KW needs at least two semiblocks...
         assert_eq!(
             <CASAES256KW as CASAES256KeyWrap>::wrap_key(kek.clone(), vec![0u8; 8]),
@@ -324,7 +328,7 @@ mod aes_kw {
 
     #[test]
     fn unwrap_key_rejects_invalid_wrapped_length() {
-        let kek = vec![0u8; 32];
+        let kek = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
         // Below the three-semiblock minimum for unpadded KW.
         assert_eq!(
             <CASAES256KW as CASAES256KeyWrap>::unwrap_key(kek.clone(), vec![0u8; 16]),
