@@ -27,12 +27,12 @@ impl CASAsconAead for AsconAead {
 
     /// Generates a 16-byte key for Ascon Aead
     fn generate_key() -> Vec<u8> {
-        aead_helpers::random_bytes(ASCON_KEY_LEN)
+        aead_helpers::random_bytes::<ASCON_KEY_LEN>()
     }
 
     /// Generates a Ascon Aead nonce
     fn generate_nonce() -> Vec<u8> {
-        aead_helpers::random_bytes(ASCON_NONCE_LEN)
+        aead_helpers::random_bytes::<ASCON_NONCE_LEN>()
     }
 }
 

@@ -4,7 +4,7 @@
 //! checks, associated data, and the `seal` / `open` framing.
 
 use aes_gcm::aead::{array::typenum::Unsigned, Aead, AeadCore, KeyInit, Nonce, Payload};
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, Rng, RngCore};
 
 use crate::error::{CasError, CasResult};
 
@@ -17,11 +17,15 @@ fn cipher<A: KeyInit>(key: &[u8]) -> CasResult<A> {
     A::new_from_slice(key).map_err(|_| CasError::InvalidKey)
 }
 
-/// Returns `len` bytes from `OsRng`, for keys and caller-managed nonces.
-pub(crate) fn random_bytes(len: usize) -> Vec<u8> {
-    let mut bytes = vec![0u8; len];
-    OsRng.fill_bytes(&mut bytes);
-    bytes
+/// Returns `N` bytes from `OsRng`, for keys and caller-managed nonces.
+///
+/// Generates the array directly rather than filling a zeroed buffer, which
+/// CodeQL reads as a hard-coded key or nonce (`rust/hard-coded-cryptographic-value`).
+pub(crate) fn random_bytes<const N: usize>() -> Vec<u8>
+where
+    rand::distributions::Standard: rand::distributions::Distribution<[u8; N]>,
+{
+    OsRng.gen::<[u8; N]>().to_vec()
 }
 
 /// Parses a caller-supplied nonce, rejecting one of the wrong length.

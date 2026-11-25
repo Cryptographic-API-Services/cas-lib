@@ -31,7 +31,7 @@ impl CASAES256Encryption for CASAES256 {
 
     /// Generates an AES 256 32-bit Key
     fn generate_key() -> Vec<u8> {
-        aead_helpers::random_bytes(AES256_KEY_LEN)
+        aead_helpers::random_bytes::<AES256_KEY_LEN>()
     }
 
 
@@ -66,7 +66,7 @@ impl CASAES256Encryption for CASAES256 {
 
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        aead_helpers::random_bytes(AES_NONCE_LEN)
+        aead_helpers::random_bytes::<AES_NONCE_LEN>()
     }
 }
 
@@ -109,7 +109,7 @@ impl CASAES128Encryption for CASAES128 {
 
     /// Generates an AES-128 16-byte key
     fn generate_key() -> Vec<u8> {
-        aead_helpers::random_bytes(AES128_KEY_LEN)
+        aead_helpers::random_bytes::<AES128_KEY_LEN>()
     }
 
 
@@ -148,7 +148,7 @@ impl CASAES128Encryption for CASAES128 {
 
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        aead_helpers::random_bytes(AES_NONCE_LEN)
+        aead_helpers::random_bytes::<AES_NONCE_LEN>()
     }
 }
 

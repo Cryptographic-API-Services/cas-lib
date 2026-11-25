@@ -72,7 +72,7 @@ fn take_unwrapped(buf: Zeroizing<Vec<u8>>, len: usize) -> Vec<u8> {
 impl CASAES256KeyWrap for CASAES256KW {
     /// Generates a 32-byte AES-256 key-encryption key (KEK)
     fn generate_kek() -> Vec<u8> {
-        random_bytes(AES256_KEY_LEN)
+        random_bytes::<AES256_KEY_LEN>()
     }
 
     /// Wraps a key with AES-256-KW (RFC 3394 / NIST SP 800-38F KW).
@@ -126,7 +126,7 @@ impl CASAES256KeyWrap for CASAES256KW {
 impl CASAES128KeyWrap for CASAES128KW {
     /// Generates a 16-byte AES-128 key-encryption key (KEK)
     fn generate_kek() -> Vec<u8> {
-        random_bytes(AES128_KEY_LEN)
+        random_bytes::<AES128_KEY_LEN>()
     }
 
     /// Wraps a key with AES-128-KW (RFC 3394 / NIST SP 800-38F KW).

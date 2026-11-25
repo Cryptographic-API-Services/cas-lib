@@ -31,7 +31,7 @@ impl CASAES256SIVEncryption for CASAES256SIV {
 
     /// Generates an AES-256-GCM-SIV 32-byte key
     fn generate_key() -> Vec<u8> {
-        aead_helpers::random_bytes(AES256_KEY_LEN)
+        aead_helpers::random_bytes::<AES256_KEY_LEN>()
     }
 
     /// Encrypts with AES-256-GCM-SIV taking an aes_key and nonce
@@ -63,7 +63,7 @@ impl CASAES256SIVEncryption for CASAES256SIV {
 
     /// Generates an AES-GCM-SIV nonce
     fn generate_nonce() -> Vec<u8> {
-        aead_helpers::random_bytes(AES_SIV_NONCE_LEN)
+        aead_helpers::random_bytes::<AES_SIV_NONCE_LEN>()
     }
 }
 
@@ -80,7 +80,7 @@ impl CASAES128SIVEncryption for CASAES128SIV {
 
     /// Generates an AES-128-GCM-SIV 16-byte key
     fn generate_key() -> Vec<u8> {
-        aead_helpers::random_bytes(AES128_KEY_LEN)
+        aead_helpers::random_bytes::<AES128_KEY_LEN>()
     }
 
     /// Encrypts with AES-128-GCM-SIV taking an aes_key and nonce
@@ -112,7 +112,7 @@ impl CASAES128SIVEncryption for CASAES128SIV {
 
     /// Generates an AES-GCM-SIV nonce
     fn generate_nonce() -> Vec<u8> {
-        aead_helpers::random_bytes(AES_SIV_NONCE_LEN)
+        aead_helpers::random_bytes::<AES_SIV_NONCE_LEN>()
     }
 }
 

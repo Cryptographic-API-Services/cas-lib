@@ -14,7 +14,7 @@ pub struct CASChacha20Poly1305;
 impl Chacha20Poly1305Encryption for CASChacha20Poly1305 {
 
     fn generate_key() -> Vec<u8> {
-        aead_helpers::random_bytes(CHACHA20_KEY_LEN)
+        aead_helpers::random_bytes::<CHACHA20_KEY_LEN>()
     }
 
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>> {
@@ -26,7 +26,7 @@ impl Chacha20Poly1305Encryption for CASChacha20Poly1305 {
     }
 
     fn generate_nonce() -> Vec<u8> {
-        aead_helpers::random_bytes(CHACHA20_NONCE_LEN)
+        aead_helpers::random_bytes::<CHACHA20_NONCE_LEN>()
     }
 }
 
