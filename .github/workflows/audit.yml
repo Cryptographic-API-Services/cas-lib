@@ -1,0 +1,50 @@
+# Checks Cargo.lock against the RustSec advisory database (#108).
+#
+# - Runs on every PR, on every push to main, and weekly: the advisory database
+#   changes when the lockfile doesn't, so the schedule catches new advisories
+#   against an unchanged main.
+# - Vulnerabilities fail the job, as do `unsound` and `yanked` warnings: in a
+#   crypto library an unsound dependency is a memory-safety bug, and a yanked
+#   one is usually yanked for a reason. Both are normally a lockfile-only fix.
+#   `unmaintained` warnings are reported but don't fail the job, because they
+#   rarely have a quick fix and would block unrelated PRs.
+# - No advisories are ignored. To ignore one, add it with `--ignore` here and
+#   say why in the PR.
+# - cargo-audit is pinned and installed with --locked; the action is pinned to
+#   a commit SHA; the workflow grants nothing beyond read access to the repo.
+name: Cargo audit
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: "23 6 * * 1" # Mondays 06:23 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_AUDIT_VERSION: 0.23.0
+
+jobs:
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+      - name: Audit Cargo.lock
+        run: cargo audit --deny unsound --deny yanked
