@@ -43,7 +43,8 @@ random salt and sensible default parameters), a customized variant, and
 `verify_password`. Hashes are returned as self-describing PHC / modular-crypt
 strings that embed the salt and parameters, so store the string as-is and pass
 it back to `verify_password` later. `verify_password` returns `Ok(false)` for a
-wrong password and an `Err` only when the stored hash cannot be parsed.
+wrong password and an `Err` only when the stored hash cannot be parsed or, for
+bcrypt, when the password is longer than 72 bytes (see [BCrypt](#bcrypt)).
 
 ### Argon2
 ```rust
@@ -92,8 +93,18 @@ fn main() {
 ```
 
 ### BCrypt
+
+bcrypt uses at most 72 bytes of a password (`BCRYPT_MAX_PASSWORD_BYTES`). The
+limit counts UTF-8 bytes, not characters. `hash_password`,
+`hash_password_customized` and `verify_password` return
+`Err(CasError::InvalidParameters)` for a longer password instead of silently
+truncating it, so two passwords that share their first 72 bytes are never
+treated as equal. Use [Argon2](#argon2) or [SCrypt](#scrypt) if you need to
+accept longer passwords.
+
 ```rust
-use cas_lib::password_hashers::bcrypt::CASBCrypt;
+use cas_lib::error::CasError;
+use cas_lib::password_hashers::bcrypt::{CASBCrypt, BCRYPT_MAX_PASSWORD_BYTES};
 
 fn main() {
     let password = "HashThisBadPassword".to_string();
@@ -105,7 +116,12 @@ fn main() {
 
     // Custom cost (4-31); each +1 doubles the work.
     let hash = CASBCrypt::hash_password_customized(password.clone(), 10).unwrap();
-    println!("verified: {}", CASBCrypt::verify_password(hash, password).unwrap()); // true
+    println!("verified: {}", CASBCrypt::verify_password(hash.clone(), password).unwrap()); // true
+
+    // Passwords longer than 72 bytes are rejected on both hash and verify.
+    let too_long = "x".repeat(BCRYPT_MAX_PASSWORD_BYTES + 1);
+    assert_eq!(CASBCrypt::hash_password(too_long.clone()), Err(CasError::InvalidParameters));
+    assert_eq!(CASBCrypt::verify_password(hash, too_long), Err(CasError::InvalidParameters));
 }
 ```
 

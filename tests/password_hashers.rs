@@ -3,7 +3,12 @@ mod password_hashers {
     use std::path::Path;
     use cas_lib::{
         error::CasError,
-        password_hashers::{argon2::CASArgon, bcrypt::CASBCrypt, pbkdf2, scrypt::CASScrypt},
+        password_hashers::{
+            argon2::CASArgon,
+            bcrypt::{CASBCrypt, BCRYPT_MAX_PASSWORD_BYTES},
+            pbkdf2,
+            scrypt::CASScrypt,
+        },
         symmetric::{
             aes::{CASAES128, CASAES256},
             cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption},
@@ -82,6 +87,102 @@ mod password_hashers {
         let hash = CASBCrypt::hash_password_customized(password.clone(), 12).unwrap();
         let verification = CASBCrypt::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
+    }
+
+    #[test]
+    pub fn bcrypt_accepts_72_byte_password() {
+        let password = "x".repeat(BCRYPT_MAX_PASSWORD_BYTES);
+        assert_eq!(password.len(), 72);
+        let hash = CASBCrypt::hash_password_customized(password.clone(), 4).unwrap();
+        assert!(CASBCrypt::verify_password(hash.clone(), password).unwrap());
+        // Changing the last of the 72 bytes changes the result: no byte is dropped.
+        let last_byte_differs = format!("{}y", "x".repeat(71));
+        assert!(!CASBCrypt::verify_password(hash, last_byte_differs).unwrap());
+    }
+
+    #[test]
+    pub fn bcrypt_accepts_72_byte_multibyte_password() {
+        // 24 three-byte characters: 24 chars, 72 bytes.
+        let password = "€".repeat(24);
+        assert_eq!(password.len(), 72);
+        let hash = CASBCrypt::hash_password_customized(password.clone(), 4).unwrap();
+        assert!(CASBCrypt::verify_password(hash, password).unwrap());
+    }
+
+    #[test]
+    pub fn bcrypt_rejects_73_byte_password_on_hash() {
+        let password = "x".repeat(73);
+        assert_eq!(
+            CASBCrypt::hash_password(password.clone()),
+            Err(CasError::InvalidParameters)
+        );
+        assert_eq!(
+            CASBCrypt::hash_password_customized(password, 4),
+            Err(CasError::InvalidParameters)
+        );
+        // The limit is in bytes: 25 three-byte characters is 75 bytes.
+        assert_eq!(
+            CASBCrypt::hash_password_customized("€".repeat(25), 4),
+            Err(CasError::InvalidParameters)
+        );
+    }
+
+    #[test]
+    pub fn bcrypt_rejects_73_byte_password_on_verify() {
+        let hash = CASBCrypt::hash_password_customized("DoNotUseThisPassword".to_string(), 4).unwrap();
+        assert_eq!(
+            CASBCrypt::verify_password(hash, "x".repeat(73)),
+            Err(CasError::InvalidParameters)
+        );
+    }
+
+    #[test]
+    pub fn bcrypt_passwords_sharing_first_72_bytes_are_not_equal() {
+        let prefix = "x".repeat(72);
+        let first = format!("{}first", prefix);
+        let second = format!("{}second", prefix);
+
+        // Neither long password can be hashed, so they cannot collide.
+        assert_eq!(
+            CASBCrypt::hash_password_customized(first, 4),
+            Err(CasError::InvalidParameters)
+        );
+
+        // A long password no longer verifies against a hash of its first 72 bytes.
+        let prefix_hash = CASBCrypt::hash_password_customized(prefix.clone(), 4).unwrap();
+        assert!(CASBCrypt::verify_password(prefix_hash.clone(), prefix).unwrap());
+        assert_eq!(
+            CASBCrypt::verify_password(prefix_hash, second),
+            Err(CasError::InvalidParameters)
+        );
+    }
+
+    #[test]
+    pub fn bcrypt_verifies_hash_from_truncating_version() {
+        // bcrypt of "x" * 100 with cost 5, made by a truncating implementation
+        // (the vector from the `bcrypt` crate's own tests, produced with Python's
+        // bcrypt). It is the hash of the first 72 bytes, so the 72-byte password
+        // still verifies while the original 100-byte input is now rejected.
+        let legacy_hash = "$2a$05$......................YgIDy4hFBdVlc/6LHnD9mX488r9cLd2".to_string();
+        assert!(CASBCrypt::verify_password(legacy_hash.clone(), "x".repeat(72)).unwrap());
+        assert!(!CASBCrypt::verify_password(legacy_hash.clone(), "x".repeat(71)).unwrap());
+        assert_eq!(
+            CASBCrypt::verify_password(legacy_hash, "x".repeat(100)),
+            Err(CasError::InvalidParameters)
+        );
+    }
+
+    #[test]
+    pub fn bcrypt_verifies_hash_created_before_length_check() {
+        // Earlier versions of this crate hashed with plain `bcrypt::hash`.
+        let password = "DoNotUseThisPassword".to_string();
+        let old_hash = bcrypt::hash(&password, 4).unwrap();
+        assert!(CASBCrypt::verify_password(old_hash.clone(), password).unwrap());
+        assert!(!CASBCrypt::verify_password(old_hash, "wrong".to_string()).unwrap());
+
+        // A hash made elsewhere (Python's bcrypt, from the `bcrypt` crate's tests).
+        let python_hash = "$2b$04$EGdrhbKUv8Oc9vGiXX0HQOxSg445d458Muh7DAHskb6QbtCvdxcie".to_string();
+        assert!(CASBCrypt::verify_password(python_hash, "correctbatteryhorsestapler".to_string()).unwrap());
     }
 
     fn hex_to_bytes(hex: &str) -> Vec<u8> {
