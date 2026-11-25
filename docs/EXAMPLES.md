@@ -131,22 +131,38 @@ fn main() {
 The `pbkdf2` module exposes free functions that derive a 32-byte key with
 PBKDF2-HMAC-SHA3-256. `derivation` generates a salt and returns it alongside
 the key; store the salt and iteration count so `derivation_with_salt` can
-re-derive the identical key later.
+re-derive the identical key later. Both return `CasResult` and reject an
+iteration count below `MIN_ITERATIONS` (600,000) or a salt shorter than
+`MIN_SALT_LENGTH` (16 bytes) with `CasError::InvalidParameters`.
 
 ```rust
-use cas_lib::password_hashers::pbkdf2::{derivation, derivation_with_salt};
+use cas_lib::error::CasError;
+use cas_lib::password_hashers::pbkdf2::{
+    derivation, derivation_with_salt, MIN_ITERATIONS, MIN_SALT_LENGTH,
+};
 
 fn main() {
     let password = b"HashThisBadPassword".to_vec();
-    let iterations = 600_000;
+    let iterations = MIN_ITERATIONS; // 600_000
 
     // First time: derive a key and get a fresh salt back.
-    let result = derivation(password.clone(), iterations);
+    let result = derivation(password.clone(), iterations).unwrap();
     println!("key length: {}", result.password.len()); // 32
 
     // Later: the same password + salt + iterations re-derives the same key.
-    let rederived = derivation_with_salt(password, iterations, result.salt);
+    let rederived = derivation_with_salt(password.clone(), iterations, result.salt).unwrap();
     assert_eq!(result.password, rederived);
+
+    // Too few iterations or too short a salt is rejected.
+    let short_salt = vec![0u8; MIN_SALT_LENGTH - 1];
+    assert_eq!(
+        derivation_with_salt(password.clone(), iterations, short_salt),
+        Err(CasError::InvalidParameters)
+    );
+    assert!(matches!(
+        derivation(password, 1_000),
+        Err(CasError::InvalidParameters)
+    ));
 }
 ```
 
