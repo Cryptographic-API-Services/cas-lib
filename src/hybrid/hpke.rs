@@ -5,7 +5,6 @@ use hpke::{
     Deserializable, Kem as KemTrait, OpModeR, OpModeS, Serializable,
 };
 
-use rand::rngs::OsRng;
 use uuid::Uuid;
 
 use crate::error::{CasError, CasResult};
@@ -17,13 +16,25 @@ type Kdf = HkdfSha512;
 
 pub struct CASHPKE;
 
+/// Longest `info` HPKE accepts in base mode: `hpke` panics when
+/// `info.len() + psk_id.len() + 5` reaches 2^16, and a panic must not unwind
+/// across the FFI boundary.
+const MAX_INFO_LEN: usize = u16::MAX as usize - 5;
+
+fn check_info_len(info: &[u8]) -> CasResult<()> {
+    if info.len() > MAX_INFO_LEN {
+        return Err(CasError::InvalidInput);
+    }
+    Ok(())
+}
+
 impl CASHybrid for CASHPKE {
     /// Generates a key pair for HPKE using X25519 as the KEM algorithm.
     /// Returns the private key, public key, and a random info string (see
     /// [`generate_info_str`](Self::generate_info_str) for why you should usually
     /// pass your own `info` instead).
     fn generate_key_pair() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-        let (private_key, public_key) = Kem::gen_keypair(&mut OsRng);
+        let (private_key, public_key) = Kem::gen_keypair();
         (
             private_key.to_bytes().to_vec(),
             public_key.to_bytes().to_vec(),
@@ -56,16 +67,16 @@ impl CASHybrid for CASHPKE {
     ) -> CasResult<(Vec<u8>, Vec<u8>, Vec<u8>)> {
         let public_key = <Kem as KemTrait>::PublicKey::from_bytes(public_key.as_slice())
             .map_err(|_| CasError::InvalidKey)?;
-        let (encapped_key, mut sender_ctx) = hpke::setup_sender::<Aead, Kdf, Kem, _>(
+        check_info_len(&info_str)?;
+        let (encapped_key, mut sender_ctx) = hpke::setup_sender::<Aead, Kdf, Kem>(
             &OpModeS::Base,
             &public_key,
-            &info_str.as_slice(),
-            &mut OsRng,
+            &info_str,
         )
         .map_err(|_| CasError::EncryptionFailed)?;
         let mut msg_copy = plaintext;
         let tag = sender_ctx
-            .seal_in_place_detached(&mut msg_copy, &aad)
+            .seal_inout_detached(msg_copy.as_mut_slice().into(), &aad)
             .map_err(|_| CasError::EncryptionFailed)?;
         let ciphertext = msg_copy;
         Ok((
@@ -88,6 +99,7 @@ impl CASHybrid for CASHPKE {
         info_str: Vec<u8>,
         aad: Vec<u8>,
     ) -> CasResult<Vec<u8>> {
+        check_info_len(&info_str)?;
         let server_sk = <Kem as KemTrait>::PrivateKey::from_bytes(&private_key)
             .map_err(|_| CasError::InvalidKey)?;
         let tag = AeadTag::<Aead>::from_bytes(&tag).map_err(|_| CasError::InvalidInput)?;
@@ -102,7 +114,7 @@ impl CASHybrid for CASHPKE {
         .map_err(|_| CasError::DecryptionFailed)?;
         let mut ciphertext_copy = ciphertext;
         receiver_ctx
-            .open_in_place_detached(&mut ciphertext_copy, &aad, &tag)
+            .open_inout_detached(ciphertext_copy.as_mut_slice().into(), &aad, &tag)
             .map_err(|_| CasError::DecryptionFailed)?;
         let plaintext = ciphertext_copy;
         Ok(plaintext)

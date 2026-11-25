@@ -79,4 +79,27 @@ mod hybrid {
             CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info_str, b"extra".to_vec());
         assert_eq!(result, Err(CasError::DecryptionFailed));
     }
+
+    /// HPKE panics on an `info` of 2^16 - 5 bytes or more; the crate must
+    /// return an error instead, since a panic can't cross the FFI boundary.
+    #[test]
+    pub fn hpke_rejects_oversized_info_without_panicking() {
+        let (private_key, public_key, _) = CASHPKE::generate_key_pair();
+        let longest = vec![0u8; u16::MAX as usize - 5];
+        let too_long = vec![0u8; u16::MAX as usize - 4];
+
+        let (encapped_key, ciphertext, tag) =
+            CASHPKE::encrypt(b"hello".to_vec(), public_key.clone(), longest.clone(), Vec::new())
+                .unwrap();
+        let plaintext = CASHPKE::decrypt(
+            ciphertext.clone(), private_key.clone(), encapped_key.clone(), tag.clone(), longest, Vec::new(),
+        );
+        assert_eq!(plaintext, Ok(b"hello".to_vec()));
+
+        let encrypted = CASHPKE::encrypt(b"hello".to_vec(), public_key, too_long.clone(), Vec::new());
+        assert_eq!(encrypted, Err(CasError::InvalidInput));
+        let decrypted =
+            CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, too_long, Vec::new());
+        assert_eq!(decrypted, Err(CasError::InvalidInput));
+    }
 }

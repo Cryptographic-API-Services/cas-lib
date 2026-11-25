@@ -1,11 +1,4 @@
-use aes_gcm::{Key};
-
-use rand::{RngCore, rngs::OsRng};
-
-use aes_gcm::{
-    aead::{Aead, Payload},
-    Aes128Gcm, Aes256Gcm, KeyInit, Nonce,
-};
+use aes_gcm::{Aes128Gcm, Aes256Gcm};
 
 use crate::error::{CasError, CasResult};
 use crate::key_exchange::x25519::{
@@ -33,48 +26,24 @@ impl CASAES256Encryption for CASAES256 {
         if key_slice.len() != AES256_KEY_LEN {
             return Err(CasError::InvalidKey);
         }
-        let key = Key::<Aes256Gcm>::from_slice(key_slice.as_slice());
-        Ok(key.to_vec())
+        Ok(key_slice)
     }
 
     /// Generates an AES 256 32-bit Key
     fn generate_key() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        return Aes256Gcm::generate_key(&mut os_rng).to_vec();
+        aead_helpers::random_bytes::<AES256_KEY_LEN>()
     }
 
 
     /// Encrypts with AES-256-GCM taking an aes_key and aes_nonce
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES256_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes256Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .map_err(|_| CasError::EncryptionFailed)
+        aead_helpers::encrypt_with_aad::<Aes256Gcm>(&aes_key, &nonce, &plaintext, &[])
     }
 
 
     /// Decrypts with AES-256-GCM taking an aes_key and aes_nonce
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES256_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes256Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .decrypt(nonce, ciphertext.as_ref())
-            .map_err(|_| CasError::DecryptionFailed)
+        aead_helpers::decrypt_with_aad::<Aes256Gcm>(&aes_key, &nonce, &ciphertext, &[])
     }
 
     /// Derives a 256-bit AES-256-GCM key from an X25519 shared secret with HKDF-SHA256.
@@ -97,10 +66,7 @@ impl CASAES256Encryption for CASAES256 {
 
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        let mut nonce = [0u8; AES_NONCE_LEN];
-        os_rng.fill_bytes(&mut nonce);
-        nonce.to_vec()
+        aead_helpers::random_bytes::<AES_NONCE_LEN>()
     }
 }
 
@@ -108,34 +74,12 @@ impl CASAES256AadEncryption for CASAES256 {
 
     /// Encrypts with AES-256-GCM taking an aes_key, aes_nonce and additional authenticated data
     fn encrypt_plaintext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES256_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes256Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .encrypt(nonce, Payload { msg: plaintext.as_slice(), aad: aad.as_slice() })
-            .map_err(|_| CasError::EncryptionFailed)
+        aead_helpers::encrypt_with_aad::<Aes256Gcm>(&aes_key, &nonce, &plaintext, &aad)
     }
 
     /// Decrypts with AES-256-GCM taking an aes_key, aes_nonce and additional authenticated data
     fn decrypt_ciphertext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES256_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes256Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .decrypt(nonce, Payload { msg: ciphertext.as_slice(), aad: aad.as_slice() })
-            .map_err(|_| CasError::DecryptionFailed)
+        aead_helpers::decrypt_with_aad::<Aes256Gcm>(&aes_key, &nonce, &ciphertext, &aad)
     }
 }
 
@@ -143,34 +87,12 @@ impl CASAES128AadEncryption for CASAES128 {
 
     /// Encrypts with AES-128-GCM taking an aes_key, aes_nonce and additional authenticated data
     fn encrypt_plaintext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES128_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes128Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes128Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .encrypt(nonce, Payload { msg: plaintext.as_slice(), aad: aad.as_slice() })
-            .map_err(|_| CasError::EncryptionFailed)
+        aead_helpers::encrypt_with_aad::<Aes128Gcm>(&aes_key, &nonce, &plaintext, &aad)
     }
 
     /// Decrypts with AES-128-GCM taking an aes_key, aes_nonce and additional authenticated data
     fn decrypt_ciphertext_with_aad(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>, aad: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES128_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes128Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes128Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .decrypt(nonce, Payload { msg: ciphertext.as_slice(), aad: aad.as_slice() })
-            .map_err(|_| CasError::DecryptionFailed)
+        aead_helpers::decrypt_with_aad::<Aes128Gcm>(&aes_key, &nonce, &ciphertext, &aad)
     }
 }
 
@@ -182,50 +104,26 @@ impl CASAES128Encryption for CASAES128 {
         if key_slice.len() != AES128_KEY_LEN {
             return Err(CasError::InvalidKey);
         }
-        let key = Key::<Aes128Gcm>::from_slice(key_slice.as_slice());
-        Ok(key.to_vec())
+        Ok(key_slice)
     }
 
     /// Generates an AES-128 16-byte key
     fn generate_key() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        return Aes128Gcm::generate_key(&mut os_rng).to_vec();
+        aead_helpers::random_bytes::<AES128_KEY_LEN>()
     }
 
 
 
     /// Encrypts with AES-128-GCM taking an aes_key and aes_nonce
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES128_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes128Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes128Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .map_err(|_| CasError::EncryptionFailed)
+        aead_helpers::encrypt_with_aad::<Aes128Gcm>(&aes_key, &nonce, &plaintext, &[])
     }
 
 
 
     /// Decrypts with AES-128-GCM taking an aes_key and aes_nonce
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>> {
-        if aes_key.len() != AES128_KEY_LEN {
-            return Err(CasError::InvalidKey);
-        }
-        if nonce.len() != AES_NONCE_LEN {
-            return Err(CasError::InvalidNonce);
-        }
-        let key = Key::<Aes128Gcm>::from_slice(aes_key.as_slice());
-        let cipher = Aes128Gcm::new(key);
-        let nonce = Nonce::from_slice(nonce.as_slice());
-        cipher
-            .decrypt(nonce, ciphertext.as_ref())
-            .map_err(|_| CasError::DecryptionFailed)
+        aead_helpers::decrypt_with_aad::<Aes128Gcm>(&aes_key, &nonce, &ciphertext, &[])
     }
 
 
@@ -250,10 +148,7 @@ impl CASAES128Encryption for CASAES128 {
 
     /// Generates an AES nonce
     fn generate_nonce() -> Vec<u8> {
-        let mut os_rng = OsRng;
-        let mut nonce = [0u8; AES_NONCE_LEN];
-        os_rng.fill_bytes(&mut nonce);
-        nonce.to_vec()
+        aead_helpers::random_bytes::<AES_NONCE_LEN>()
     }
 }
 

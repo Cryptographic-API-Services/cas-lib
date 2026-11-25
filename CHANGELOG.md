@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.6.0...v0.7.0) - 2026-11-25
+
+Upgrades every AEAD dependency to `aead` 0.6 (#85), so the crate builds one `aead`/`aes` stack. The public API is unchanged, and so are the key, nonce and ciphertext formats: keys and data from 0.6.0 keep working.
+
+### Changed
+
+- **AEAD dependencies on `aead` 0.6** (#85): `aes-gcm` 0.11 (`aes` 0.9), `aes-gcm-siv` 0.12, `chacha20poly1305` 0.11, `ascon-aead` 0.6, `hpke` 0.15 and `aes-kw` 0.3.
+
+### Fixed
+
+- **HPKE `info` length** (#85): `CASHPKE::encrypt` / `decrypt` return `CasError::InvalidInput` for an `info` longer than 65,530 bytes. `hpke` panics on one that long, and a panic must not unwind across the FFI boundary.
+
+### Security
+
+- AES-KW / AES-KWP unwrap zeroizes its intermediate buffer holding the unwrapped key.
+
 ## [0.6.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.5.1...v0.6.0) - 2026-11-25
 
 Fixes the two Info-level findings from the November 2026 security review (#121, #122), the last open items from #103 and #104.

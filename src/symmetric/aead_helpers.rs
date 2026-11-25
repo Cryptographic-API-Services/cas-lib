@@ -1,10 +1,10 @@
 //! Shared AEAD plumbing used by every AEAD in the crate (AES-GCM, AES-GCM-SIV,
 //! ChaCha20-Poly1305 and Ascon-AEAD128). All of them are built on the same
-//! `aead` 0.5 traits, so one generic implementation covers key/nonce length
+//! `aead` 0.6 traits, so one generic implementation covers key/nonce length
 //! checks, associated data, and the `seal` / `open` framing.
 
-use aes_gcm::aead::{generic_array::typenum::Unsigned, Aead, AeadCore, KeyInit, Nonce, Payload};
-use rand::{rngs::OsRng, RngCore};
+use aes_gcm::aead::{array::typenum::Unsigned, Aead, AeadCore, KeyInit, Nonce, Payload};
+use rand::{rngs::OsRng, Rng, RngCore};
 
 use crate::error::{CasError, CasResult};
 
@@ -17,6 +17,22 @@ fn cipher<A: KeyInit>(key: &[u8]) -> CasResult<A> {
     A::new_from_slice(key).map_err(|_| CasError::InvalidKey)
 }
 
+/// Returns `N` bytes from `OsRng`, for keys and caller-managed nonces.
+///
+/// Generates the array directly rather than filling a zeroed buffer, which
+/// CodeQL reads as a hard-coded key or nonce (`rust/hard-coded-cryptographic-value`).
+pub(crate) fn random_bytes<const N: usize>() -> Vec<u8>
+where
+    rand::distributions::Standard: rand::distributions::Distribution<[u8; N]>,
+{
+    OsRng.gen::<[u8; N]>().to_vec()
+}
+
+/// Parses a caller-supplied nonce, rejecting one of the wrong length.
+fn nonce<A: AeadCore>(nonce: &[u8]) -> CasResult<&Nonce<A>> {
+    <&Nonce<A>>::try_from(nonce).map_err(|_| CasError::InvalidNonce)
+}
+
 /// Encrypts `plaintext` under a caller-supplied nonce, binding `aad`.
 /// Returns `ciphertext || tag`.
 pub(crate) fn encrypt_with_aad<A: Aead + KeyInit>(
@@ -26,11 +42,9 @@ pub(crate) fn encrypt_with_aad<A: Aead + KeyInit>(
     aad: &[u8],
 ) -> CasResult<Vec<u8>> {
     let cipher = cipher::<A>(key)?;
-    if nonce.len() != nonce_len::<A>() {
-        return Err(CasError::InvalidNonce);
-    }
+    let nonce = self::nonce::<A>(nonce)?;
     cipher
-        .encrypt(Nonce::<A>::from_slice(nonce), Payload { msg: plaintext, aad })
+        .encrypt(nonce, Payload { msg: plaintext, aad })
         .map_err(|_| CasError::EncryptionFailed)
 }
 
@@ -42,11 +56,9 @@ pub(crate) fn decrypt_with_aad<A: Aead + KeyInit>(
     aad: &[u8],
 ) -> CasResult<Vec<u8>> {
     let cipher = cipher::<A>(key)?;
-    if nonce.len() != nonce_len::<A>() {
-        return Err(CasError::InvalidNonce);
-    }
+    let nonce = self::nonce::<A>(nonce)?;
     cipher
-        .decrypt(Nonce::<A>::from_slice(nonce), Payload { msg: ciphertext, aad })
+        .decrypt(nonce, Payload { msg: ciphertext, aad })
         .map_err(|_| CasError::DecryptionFailed)
 }
 
@@ -87,7 +99,7 @@ pub(crate) fn open<A: Aead + KeyInit>(
     let (nonce, ciphertext) = sealed.split_at(nonce_len);
     cipher
         .decrypt(
-            Nonce::<A>::from_slice(nonce),
+            self::nonce::<A>(nonce)?,
             Payload { msg: ciphertext, aad: aad.unwrap_or_default() },
         )
         .map_err(|_| CasError::DecryptionFailed)
