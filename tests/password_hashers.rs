@@ -158,7 +158,9 @@ mod password_hashers {
 
     #[test]
     pub fn argon2_derive_with_salt_rejects_short_salt() {
-        let short = vec![0u8; MIN_SALT_LENGTH - 1];
+        // A random salt one byte too short.
+        let mut short = CASArgon::generate_salt();
+        short.truncate(MIN_SALT_LENGTH - 1);
         assert!(matches!(
             CASArgon::derive_aes_128_key_with_salt(b"pw".to_vec(), short.clone()),
             Err(CasError::InvalidParameters)
@@ -167,7 +169,9 @@ mod password_hashers {
             CASArgon::derive_aes_256_key_with_salt(b"pw".to_vec(), short),
             Err(CasError::InvalidParameters)
         ));
-        assert!(CASArgon::derive_aes_128_key_with_salt(b"pw".to_vec(), vec![0u8; MIN_SALT_LENGTH]).is_ok());
+        let mut exact = CASArgon::generate_salt();
+        exact.truncate(MIN_SALT_LENGTH);
+        assert!(CASArgon::derive_aes_128_key_with_salt(b"pw".to_vec(), exact).is_ok());
     }
 
     #[test]

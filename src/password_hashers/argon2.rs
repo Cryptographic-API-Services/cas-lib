@@ -2,7 +2,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Params
 };
-use rand::RngCore;
+use rand::Rng;
 use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
@@ -99,9 +99,7 @@ impl CASArgon {
     /// The salt is not secret. Store it next to whatever the key protects, and pass
     /// it back with the same password to re-derive the same key.
     pub fn generate_salt() -> Vec<u8> {
-        let mut salt = vec![0u8; KDF_SALT_LENGTH];
-        OsRng.fill_bytes(&mut salt);
-        salt
+        OsRng.gen::<[u8; KDF_SALT_LENGTH]>().to_vec()
     }
 
     /// Derives a 128-bit AES key from a password and salt with Argon2id.
