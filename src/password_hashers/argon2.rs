@@ -22,6 +22,37 @@ pub const MIN_PARALLELISM: u32 = 1;
 /// The largest degree of parallelism accepted when hashing or verifying.
 pub const MAX_PARALLELISM: u32 = 16;
 
+/// Argon2id memory cost, in KiB, of the AES key derivation functions: 19 MiB. With
+/// [`KDF_ITERATIONS`] and [`KDF_PARALLELISM`] this is the OWASP minimum for Argon2id and
+/// the `argon2` crate's current default. The values are fixed here rather than taken
+/// from `Argon2::default()`, so a later `argon2` release can't change the key derived
+/// from a stored salt.
+pub const KDF_MEMORY_COST_KIB: u32 = 19 * 1024;
+/// Argon2id iteration count of the AES key derivation functions.
+pub const KDF_ITERATIONS: u32 = 2;
+/// Argon2id degree of parallelism of the AES key derivation functions.
+pub const KDF_PARALLELISM: u32 = 1;
+/// Length, in bytes, of the salt [`CASArgon::generate_salt`] returns.
+pub const KDF_SALT_LENGTH: usize = 16;
+/// The shortest salt, in bytes, the `derive_aes_*_key_with_salt` functions accept.
+pub const MIN_SALT_LENGTH: usize = 16;
+
+/// Argon2id (v0x13) with the fixed `KDF_*` parameters, writing `key_len` bytes.
+fn derive_key(password: Vec<u8>, salt: &[u8], key_len: usize) -> CasResult<Vec<u8>> {
+    let password = Zeroizing::new(password);
+    if salt.len() < MIN_SALT_LENGTH {
+        return Err(CasError::InvalidParameters);
+    }
+    let params = Params::new(KDF_MEMORY_COST_KIB, KDF_ITERATIONS, KDF_PARALLELISM, Some(key_len))
+        .map_err(|_| CasError::InvalidParameters)?;
+    let mut key = Zeroizing::new(vec![0u8; key_len]);
+    Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params)
+        .hash_password_into(password.as_ref(), salt, &mut key)
+        .map_err(|_| CasError::PasswordHashingFailed)?;
+    // Hand the buffer to the caller without leaving an unzeroed copy behind.
+    Ok(std::mem::take(&mut *key))
+}
+
 pub struct CASArgon;
 
 impl CASArgon {
@@ -61,42 +92,74 @@ impl CASArgon {
             .map_err(|_| CasError::PasswordHashingFailed)?;
         Ok(hash.to_string())
     }
-    /// Derives a 128-bit AES key from a password using Argon2.
-    /// Returns the derived key as a vector of bytes.
+    /// Generates a random [`KDF_SALT_LENGTH`]-byte salt for
+    /// [`derive_aes_128_key_with_salt`](Self::derive_aes_128_key_with_salt) and
+    /// [`derive_aes_256_key_with_salt`](Self::derive_aes_256_key_with_salt).
     ///
-    /// The returned key is secret and owned by the caller, who must zeroize it when done
-    /// (FFI layers: before freeing it). See the crate-level docs.
-    pub fn derive_aes_128_key(password: Vec<u8>) -> CasResult<Vec<u8>> {
-        let password = Zeroizing::new(password);
-        let mut rng = OsRng;
-        let mut salt: [u8; 16] = [0; 16];
-        rng.fill_bytes(&mut salt);
-
-        let mut key = Zeroizing::new(vec![0u8; 16]);
-        Argon2::default()
-            .hash_password_into(password.as_ref(), &salt, &mut key)
-            .map_err(|_| CasError::PasswordHashingFailed)?;
-        // Hand the buffer to the caller without leaving an unzeroed copy behind.
-        Ok(std::mem::take(&mut *key))
+    /// The salt is not secret. Store it next to whatever the key protects, and pass
+    /// it back with the same password to re-derive the same key.
+    pub fn generate_salt() -> Vec<u8> {
+        let mut salt = vec![0u8; KDF_SALT_LENGTH];
+        OsRng.fill_bytes(&mut salt);
+        salt
     }
 
-    /// Derives a 256-bit AES key from a password using Argon2.
-    /// Returns the derived key as a vector of bytes.
+    /// Derives a 128-bit AES key from a password and salt with Argon2id.
+    ///
+    /// The same password and salt always give the same key. Use
+    /// [`generate_salt`](Self::generate_salt) for a new key, and store the salt to
+    /// re-derive it. The cost parameters are fixed: see [`KDF_MEMORY_COST_KIB`].
+    ///
+    /// Returns [`CasError::InvalidParameters`] if `salt` is shorter than
+    /// [`MIN_SALT_LENGTH`] bytes.
     ///
     /// The returned key is secret and owned by the caller, who must zeroize it when done
     /// (FFI layers: before freeing it). See the crate-level docs.
-    pub fn derive_aes_256_key(password: Vec<u8>) -> CasResult<Vec<u8>> {
-        let password = Zeroizing::new(password);
-        let mut rng = OsRng;
-        let mut salt: [u8; 16] = [0; 16];
-        rng.fill_bytes(&mut salt);
+    pub fn derive_aes_128_key_with_salt(password: Vec<u8>, salt: Vec<u8>) -> CasResult<Vec<u8>> {
+        derive_key(password, &salt, 16)
+    }
 
-        let mut key = Zeroizing::new(vec![0u8; 32]);
-        Argon2::default()
-            .hash_password_into(password.as_ref(), &salt, &mut key)
-            .map_err(|_| CasError::PasswordHashingFailed)?;
-        // Hand the buffer to the caller without leaving an unzeroed copy behind.
-        Ok(std::mem::take(&mut *key))
+    /// Derives a 256-bit AES key from a password and salt with Argon2id.
+    ///
+    /// The same password and salt always give the same key. Use
+    /// [`generate_salt`](Self::generate_salt) for a new key, and store the salt to
+    /// re-derive it. The cost parameters are fixed: see [`KDF_MEMORY_COST_KIB`].
+    ///
+    /// Returns [`CasError::InvalidParameters`] if `salt` is shorter than
+    /// [`MIN_SALT_LENGTH`] bytes.
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
+    pub fn derive_aes_256_key_with_salt(password: Vec<u8>, salt: Vec<u8>) -> CasResult<Vec<u8>> {
+        derive_key(password, &salt, 32)
+    }
+
+    /// Derives a 128-bit AES key from a password using Argon2, with a random salt that
+    /// is **not returned**: the same password never gives the same key again, so this is
+    /// a slow random-key generator, not a password-based KDF.
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
+    #[deprecated(
+        since = "0.6.0",
+        note = "the salt is discarded, so the key can't be re-derived; use `generate_salt` and `derive_aes_128_key_with_salt`"
+    )]
+    pub fn derive_aes_128_key(password: Vec<u8>) -> CasResult<Vec<u8>> {
+        derive_key(password, &Self::generate_salt(), 16)
+    }
+
+    /// Derives a 256-bit AES key from a password using Argon2, with a random salt that
+    /// is **not returned**: the same password never gives the same key again, so this is
+    /// a slow random-key generator, not a password-based KDF.
+    ///
+    /// The returned key is secret and owned by the caller, who must zeroize it when done
+    /// (FFI layers: before freeing it). See the crate-level docs.
+    #[deprecated(
+        since = "0.6.0",
+        note = "the salt is discarded, so the key can't be re-derived; use `generate_salt` and `derive_aes_256_key_with_salt`"
+    )]
+    pub fn derive_aes_256_key(password: Vec<u8>) -> CasResult<Vec<u8>> {
+        derive_key(password, &Self::generate_salt(), 32)
     }
 
     /// Hashes a password using Argon2.

@@ -171,9 +171,18 @@ mod zeroize_tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn argon2_derived_keys_have_expected_length() {
         let k128 = CASArgon::derive_aes_128_key(b"password".to_vec()).unwrap();
         let k256 = CASArgon::derive_aes_256_key(b"password".to_vec()).unwrap();
+        assert_eq!(k128.len(), 16);
+        assert_eq!(k256.len(), 32);
+        assert!(k128.iter().any(|&b| b != 0));
+        assert!(k256.iter().any(|&b| b != 0));
+
+        let salt = CASArgon::generate_salt();
+        let k128 = CASArgon::derive_aes_128_key_with_salt(b"password".to_vec(), salt.clone()).unwrap();
+        let k256 = CASArgon::derive_aes_256_key_with_salt(b"password".to_vec(), salt).unwrap();
         assert_eq!(k128.len(), 16);
         assert_eq!(k256.len(), 32);
         assert!(k128.iter().any(|&b| b != 0));

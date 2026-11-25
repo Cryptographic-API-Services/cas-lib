@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.5.1...v0.6.0) - 2026-11-25
+
+Fixes the two Info-level findings from the November 2026 security review (#121, #122), the last open items from #103 and #104.
+
+### Breaking changes
+
+- **PQC result structs are no longer `#[repr(C)]`** (#122): `MlKemKeyPair`, `MlKemEncapResult`, `MlKemSharedSecret`, `SlhDsaKeyPair` and `MlDsaKeyPair`. They hold `Vec<u8>`, which has no stable layout, so the attribute never made them FFI-safe. Rust code is unaffected. FFI layers must copy the fields into their own types (the binding crates already do).
+
+### Added
+
+- **Re-derivable Argon2 AES keys** (#121): `CASArgon::generate_salt`, `derive_aes_128_key_with_salt` and `derive_aes_256_key_with_salt`. The same password and salt always give the same key. Argon2id runs with fixed parameters (`KDF_MEMORY_COST_KIB` 19 MiB, `KDF_ITERATIONS` 2, `KDF_PARALLELISM` 1), pinned by a libargon2 known-answer test so a stored salt keeps working across dependency updates. Salts shorter than `MIN_SALT_LENGTH` (16 bytes) return `InvalidParameters`.
+
+### Deprecated
+
+- `CASArgon::derive_aes_128_key` / `derive_aes_256_key` (#121): they use a random salt and discard it, so the key can never be derived again. Use `generate_salt` and the `*_with_salt` functions.
+
+### Security
+
+- **HPKE** (#122): key generation and encryption draw randomness from `OsRng` directly, like the rest of the crate, instead of seeding a `StdRng`. The docs now say that `generate_info_str` (and the random `info` from `generate_key_pair`) is not domain separation: pass a fixed, application-specific `info`.
+- **Smaller published crate** (#122): an `include` list limits the package to `src/`, `LICENSE`, `README.md`, `CHANGELOG.md` and `docs/EXAMPLES.md`. Workflows, tests, test vectors and editor config are no longer uploaded to crates.io.
+- Wycheproof test downloads only use HTTPS, including after redirects (#122).
+
+### Documentation
+
+- `docs/EXAMPLES.md`: the Argon2 key-derivation example uses `generate_salt` and `derive_aes_256_key_with_salt`, the HPKE examples use application-specific `info` strings, and the post-quantum section notes that the PQC crates are pre-1.0 and unaudited and that the result structs are not FFI types.
+
 ## [0.5.1](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.5.0...v0.5.1) - 2026-11-25
 
 Dependency updates only. The public API is unchanged, and so are the key, ciphertext and signature formats: keys and data from 0.5.0 keep working.

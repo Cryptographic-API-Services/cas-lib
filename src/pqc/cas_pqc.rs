@@ -10,6 +10,15 @@
 //! out of the struct. Like every other secret this crate returns, the fields are
 //! plain `Vec<u8>` that the caller owns and must zeroize when it is done with
 //! them; see the crate-level documentation.
+//!
+//! These are Rust structs, not FFI types: a `Vec<u8>` has no stable layout, so
+//! they must not cross an FFI boundary by value. Binding layers copy the fields
+//! into their own `#[repr(C)]` types (pointer + length). The structs used to be
+//! marked `#[repr(C)]`, which suggested otherwise; it was removed in 0.6.0.
+//!
+//! The `ml-kem`, `ml-dsa` and `slh-dsa` crates behind this module are pre-1.0
+//! and have not been independently audited. `ml_kem` adds the FIPS 203 key
+//! checks (sections 7.2 and 7.3) on top of them.
 
 use std::fmt;
 
@@ -25,7 +34,6 @@ impl fmt::Debug for Redacted {
 }
 
 /// An ML-KEM-1024 key pair. `secret_key` is secret; zeroize it when done.
-#[repr(C)]
 #[derive(Clone)]
 pub struct MlKemKeyPair {
     pub secret_key: Vec<u8>,
@@ -50,7 +58,6 @@ impl Zeroize for MlKemKeyPair {
 
 /// The result of ML-KEM-1024 encapsulation. `shared_secret` is secret; zeroize
 /// it when done.
-#[repr(C)]
 #[derive(Clone)]
 pub struct MlKemEncapResult {
     pub ciphertext: Vec<u8>,
@@ -74,7 +81,6 @@ impl Zeroize for MlKemEncapResult {
 }
 
 /// An ML-KEM shared secret. `shared_secret` is secret; zeroize it when done.
-#[repr(C)]
 #[derive(Clone)]
 pub struct MlKemSharedSecret {
     pub shared_secret: Vec<u8>,
@@ -95,7 +101,6 @@ impl Zeroize for MlKemSharedSecret {
 }
 
 /// An SLH-DSA key pair. `signing_key` is secret; zeroize it when done.
-#[repr(C)]
 #[derive(Clone)]
 pub struct SlhDsaKeyPair {
     pub signing_key: Vec<u8>,
@@ -119,7 +124,6 @@ impl Zeroize for SlhDsaKeyPair {
 }
 
 /// An ML-DSA key pair. `signing_key` is secret; zeroize it when done.
-#[repr(C)]
 #[derive(Clone)]
 pub struct MlDsaKeyPair {
     pub signing_key: Vec<u8>,
