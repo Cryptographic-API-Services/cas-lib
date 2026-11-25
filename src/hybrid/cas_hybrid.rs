@@ -8,6 +8,10 @@ pub trait CASHybrid {
     /// `aad` is additional authenticated data: it is not encrypted or returned,
     /// but the recipient must pass the same bytes to [`decrypt`](Self::decrypt).
     /// Pass an empty vector for no AAD.
+    ///
+    /// `info_str` binds the derived keys to a context, and the recipient must pass the
+    /// same bytes. Use a fixed, application-specific value (for example
+    /// `b"my-app/v1/file-encryption"`) rather than a random one.
     fn encrypt(plaintext: Vec<u8>, public_key: Vec<u8>, info_str: Vec<u8>, aad: Vec<u8>) -> CasResult<(Vec<u8>, Vec<u8>, Vec<u8>)>;
     /// Decrypts a message from [`encrypt`](Self::encrypt). Fails unless `info_str`
     /// and `aad` match the values the sender used.

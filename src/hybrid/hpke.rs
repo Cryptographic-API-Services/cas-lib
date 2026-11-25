@@ -5,7 +5,7 @@ use hpke::{
     Deserializable, Kem as KemTrait, OpModeR, OpModeS, Serializable,
 };
 
-use rand::{rngs::StdRng, SeedableRng};
+use rand::rngs::OsRng;
 use uuid::Uuid;
 
 use crate::error::{CasError, CasResult};
@@ -19,10 +19,11 @@ pub struct CASHPKE;
 
 impl CASHybrid for CASHPKE {
     /// Generates a key pair for HPKE using X25519 as the KEM algorithm.
-    /// Returns the private key, public key, and an info string.
+    /// Returns the private key, public key, and a random info string (see
+    /// [`generate_info_str`](Self::generate_info_str) for why you should usually
+    /// pass your own `info` instead).
     fn generate_key_pair() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-        let mut csprng = StdRng::from_entropy();
-        let (private_key, public_key) = Kem::gen_keypair(&mut csprng);
+        let (private_key, public_key) = Kem::gen_keypair(&mut OsRng);
         (
             private_key.to_bytes().to_vec(),
             public_key.to_bytes().to_vec(),
@@ -30,8 +31,13 @@ impl CASHybrid for CASHPKE {
         )
     }
 
-    /// Generates an info string for HPKE.
-    /// Returns a vector of bytes representing the info string.
+    /// Returns 16 random bytes (a UUID v4) to use as an HPKE `info` string.
+    ///
+    /// A random value is **not** domain separation. `info` binds the derived keys to
+    /// a context, so the recipient must pass exactly the same bytes, which means this
+    /// value has to be sent or stored alongside the message. Prefer a fixed,
+    /// application-specific string that both sides already know, such as
+    /// `b"my-app/v1/file-encryption"`.
     fn generate_info_str() -> Vec<u8> {
         let uuid = Uuid::new_v4();
         let uuid_bytes: Vec<u8> = uuid.as_bytes().to_vec();
@@ -48,14 +54,13 @@ impl CASHybrid for CASHPKE {
         info_str: Vec<u8>,
         aad: Vec<u8>,
     ) -> CasResult<(Vec<u8>, Vec<u8>, Vec<u8>)> {
-        let mut csprng = StdRng::from_entropy();
         let public_key = <Kem as KemTrait>::PublicKey::from_bytes(public_key.as_slice())
             .map_err(|_| CasError::InvalidKey)?;
         let (encapped_key, mut sender_ctx) = hpke::setup_sender::<Aead, Kdf, Kem, _>(
             &OpModeS::Base,
             &public_key,
             &info_str.as_slice(),
-            &mut csprng,
+            &mut OsRng,
         )
         .map_err(|_| CasError::EncryptionFailed)?;
         let mut msg_copy = plaintext;

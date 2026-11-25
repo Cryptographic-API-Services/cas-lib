@@ -116,6 +116,8 @@ fn download(url: &str, target: &Path) -> Value {
     let partial = target.with_extension(format!("{}.partial", std::process::id()));
     let status = Command::new("curl")
         .args(["--fail", "--silent", "--show-error", "--location"])
+        // HTTPS only, including after a redirect.
+        .args(["--proto", "=https", "--proto-redir", "=https"])
         .args(["--retry", "3", "--max-time", "120", "--output"])
         .arg(&partial)
         .arg(url)

@@ -70,29 +70,40 @@ fn main() {
 
 #### Deriving an AES key from a password
 
-`derive_aes_128_key` / `derive_aes_256_key` stretch a password into a 16- or
-32-byte key with Argon2. A fresh random salt is used on every call and is not
-returned, so the derived key cannot be re-derived later — keep the key itself
-(for example, wrapped with [AES-KW](#aes-key-wrapping-aes-kw--aes-kwp)). Use
-[PBKDF2](#pbkdf2) when you need to re-derive the same key from the password.
+`derive_aes_128_key_with_salt` / `derive_aes_256_key_with_salt` stretch a
+password and salt into a 16- or 32-byte key with Argon2id (19 MiB, 2 iterations,
+1 lane, fixed by the `KDF_*` constants so a stored salt keeps giving the same
+key). Generate the salt once with `CASArgon::generate_salt()`, store it next to the
+data (it is not secret), and pass the same password and salt to derive the key
+again. Salts shorter than `MIN_SALT_LENGTH` (16 bytes) return
+`CasError::InvalidParameters`.
 
 ```rust
 use cas_lib::password_hashers::argon2::CASArgon;
 use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
 
 fn main() {
-    let key = CASArgon::derive_aes_256_key(b"correct horse battery staple".to_vec()).unwrap();
-    assert_eq!(key.len(), 32);
+    let password = b"correct horse battery staple".to_vec();
 
+    // Encrypting: make a new salt and keep it with the ciphertext.
+    let salt = CASArgon::generate_salt();
+    let key = CASArgon::derive_aes_256_key_with_salt(password.clone(), salt.clone()).unwrap();
+    assert_eq!(key.len(), 32);
     let nonce = <CASAES256 as CASAES256Encryption>::generate_nonce();
     let ciphertext =
-        <CASAES256 as CASAES256Encryption>::encrypt_plaintext(key.clone(), nonce.clone(), b"hello".to_vec())
+        <CASAES256 as CASAES256Encryption>::encrypt_plaintext(key, nonce.clone(), b"hello".to_vec())
             .unwrap();
+
+    // Decrypting later: the same password and stored salt give the same key.
+    let key_again = CASArgon::derive_aes_256_key_with_salt(password, salt).unwrap();
     let plaintext =
-        <CASAES256 as CASAES256Encryption>::decrypt_ciphertext(key, nonce, ciphertext).unwrap();
+        <CASAES256 as CASAES256Encryption>::decrypt_ciphertext(key_again, nonce, ciphertext).unwrap();
     assert_eq!(plaintext, b"hello");
 }
 ```
+
+The older `derive_aes_128_key` / `derive_aes_256_key` are deprecated: they use a
+random salt and throw it away, so the key can never be derived again.
 
 ### BCrypt
 
@@ -1043,7 +1054,7 @@ fn main() {
 ## Hybrid (HPKE)
 
 The hybrid module implements HPKE (Hybrid Public Key Encryption). The recipient
-generates a key pair and an `info` string. A sender encrypts to the recipient's
+generates a key pair. A sender encrypts to the recipient's
 public key, producing an encapsulated key, the ciphertext, and an authentication
 tag. The recipient decrypts using their private key plus those three values.
 Both `encrypt` and `decrypt` take additional authenticated data (`aad`) as their
@@ -1058,8 +1069,11 @@ fn main() {
     // Read the file to encrypt.
     let file_bytes: Vec<u8> = std::fs::read(Path::new("secret.docx")).unwrap();
 
-    // Recipient generates a key pair and info string.
-    let (private_key, public_key, info_str) = CASHPKE::generate_key_pair();
+    // Both sides use the same application-specific info string.
+    let info_str = b"my-app/v1/file-encryption".to_vec();
+
+    // Recipient generates a key pair (the third value is a random info string; see below).
+    let (private_key, public_key, _) = CASHPKE::generate_key_pair();
 
     // Sender encrypts to the recipient's public key.
     let (encapped_key, ciphertext, tag) =
@@ -1075,23 +1089,25 @@ fn main() {
 }
 ```
 
-The `info` value binds the ciphertext to a context, and decryption fails if a
-different one is supplied. `generate_key_pair` hands you a random one, but you
-can create another with `CASHPKE::generate_info_str()` (a random 16-byte UUID) or
-pass any application-specific bytes, as long as sender and recipient agree.
+The `info` value binds the derived keys to a context, and decryption fails if a
+different one is supplied. Use a fixed, application-specific string that both
+sides already know, so keys for one purpose can't be used for another.
+`generate_key_pair` also returns a random `info`, and `CASHPKE::generate_info_str()`
+makes another (a random 16-byte UUID), but a random value gives no domain
+separation and has to be sent along with every message.
 
 ```rust
 use cas_lib::hybrid::{cas_hybrid::CASHybrid, hpke::CASHPKE};
 
 fn main() {
     let (private_key, public_key, _) = CASHPKE::generate_key_pair();
-    let info = CASHPKE::generate_info_str();
+    let info = b"my-app/v1/chat".to_vec();
 
     let (encapped_key, ciphertext, tag) =
         CASHPKE::encrypt(b"hello".to_vec(), public_key, info.clone(), Vec::new()).unwrap();
 
     // A mismatched info string is rejected.
-    let wrong_info = CASHPKE::generate_info_str();
+    let wrong_info = b"my-app/v1/file-encryption".to_vec();
     assert!(CASHPKE::decrypt(
         ciphertext.clone(),
         private_key.clone(),
@@ -1117,7 +1133,8 @@ use cas_lib::error::CasError;
 use cas_lib::hybrid::{cas_hybrid::CASHybrid, hpke::CASHPKE};
 
 fn main() {
-    let (private_key, public_key, info) = CASHPKE::generate_key_pair();
+    let (private_key, public_key, _) = CASHPKE::generate_key_pair();
+    let info = b"my-app/v1/mail".to_vec();
     let header = b"to:alice;msg-id:1001".to_vec();
 
     let (encapped_key, ciphertext, tag) =
@@ -1301,6 +1318,11 @@ fn main() {
 
 The `pqc` module exposes free functions (not trait methods) for NIST's
 post-quantum standards. Keys, ciphertexts, and signatures are raw bytes.
+
+The RustCrypto `ml-kem`, `ml-dsa` and `slh-dsa` crates underneath are pre-1.0 and
+have not been independently audited. The result structs (`MlKemKeyPair` and the
+rest) hold `Vec<u8>` fields and are not FFI types: copy the fields out rather than
+passing a struct across an FFI boundary by value.
 
 ### ML-KEM-1024 (FIPS 203)
 

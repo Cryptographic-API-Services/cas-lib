@@ -4,7 +4,7 @@ mod password_hashers {
     use cas_lib::{
         error::CasError,
         password_hashers::{
-            argon2::{self, CASArgon},
+            argon2::{self, CASArgon, KDF_SALT_LENGTH, MIN_SALT_LENGTH},
             bcrypt::{CASBCrypt, BCRYPT_MAX_COST, BCRYPT_MAX_PASSWORD_BYTES, BCRYPT_MIN_COST},
             pbkdf2,
             scrypt::{self, CASScrypt},
@@ -117,7 +117,65 @@ mod password_hashers {
         assert!(!CASArgon::verify_password(weak, random_password()).unwrap());
     }
 
+    fn hex(s: &str) -> Vec<u8> {
+        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    }
+
+    /// Argon2id v0x13, m = 19456 KiB, t = 2, p = 1, salt = 00..0f. Expected values
+    /// from the libargon2 reference implementation (argon2-cffi `hash_secret_raw`).
+    /// They pin the KDF parameters: a key derived from a stored salt must never change.
     #[test]
+    pub fn argon2_derive_with_salt_known_answer() {
+        let password = b"correct horse battery staple".to_vec();
+        let salt: Vec<u8> = (0u8..16).collect();
+        assert_eq!(
+            CASArgon::derive_aes_128_key_with_salt(password.clone(), salt.clone()).unwrap(),
+            hex("911d4ab546d03a49b9d668aa5f1619cd")
+        );
+        assert_eq!(
+            CASArgon::derive_aes_256_key_with_salt(password, salt).unwrap(),
+            hex("818259b6310026a8e0dbac5d2e6927abcfdb07b32258fac4f61b18b80f929085")
+        );
+    }
+
+    #[test]
+    pub fn argon2_derive_with_salt_rederives_the_same_key() {
+        let password = random_password().into_bytes();
+        let salt = CASArgon::generate_salt();
+        assert_eq!(salt.len(), KDF_SALT_LENGTH);
+        let key = CASArgon::derive_aes_256_key_with_salt(password.clone(), salt.clone()).unwrap();
+        let again = CASArgon::derive_aes_256_key_with_salt(password.clone(), salt).unwrap();
+        assert_eq!(key, again);
+
+        // A different salt, or a different password, gives a different key.
+        let other_salt = CASArgon::derive_aes_256_key_with_salt(password, CASArgon::generate_salt()).unwrap();
+        assert_ne!(key, other_salt);
+
+        let nonce = CASAES256::generate_nonce();
+        let encrypted = CASAES256::encrypt_plaintext(key, nonce.clone(), b"hello".to_vec()).unwrap();
+        assert_eq!(CASAES256::decrypt_ciphertext(again, nonce, encrypted).unwrap(), b"hello");
+    }
+
+    #[test]
+    pub fn argon2_derive_with_salt_rejects_short_salt() {
+        // A random salt one byte too short.
+        let mut short = CASArgon::generate_salt();
+        short.truncate(MIN_SALT_LENGTH - 1);
+        assert!(matches!(
+            CASArgon::derive_aes_128_key_with_salt(b"pw".to_vec(), short.clone()),
+            Err(CasError::InvalidParameters)
+        ));
+        assert!(matches!(
+            CASArgon::derive_aes_256_key_with_salt(b"pw".to_vec(), short),
+            Err(CasError::InvalidParameters)
+        ));
+        let mut exact = CASArgon::generate_salt();
+        exact.truncate(MIN_SALT_LENGTH);
+        assert!(CASArgon::derive_aes_128_key_with_salt(b"pw".to_vec(), exact).is_ok());
+    }
+
+    #[test]
+    #[allow(deprecated)]
     pub fn argon2_derive_aes_128_and_encrypt() {
         let password = random_password().into_bytes();
         let key = CASArgon::derive_aes_128_key(password).unwrap();
@@ -131,6 +189,7 @@ mod password_hashers {
     }
 
     #[test]
+    #[allow(deprecated)]
     pub fn argon2_derive_aes_256_and_encrypt() {
         let password = random_password().into_bytes();
         let key = CASArgon::derive_aes_256_key(password).unwrap();
