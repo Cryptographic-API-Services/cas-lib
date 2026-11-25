@@ -2,6 +2,7 @@ use rand::rngs::OsRng;
 use rsa::{
     pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey},
     pkcs8::{DecodePrivateKey, EncodePrivateKey},
+    traits::PublicKeyParts,
     RsaPublicKey,
 };
 use rsa::{Pkcs1v15Sign, RsaPrivateKey};
@@ -10,9 +11,17 @@ use crate::error::{CasError, CasResult};
 
 use super::types::{CASRSAEncryption, RSAKeyPairResult};
 
-/// The smallest RSA modulus size (in bits) this library will generate.
-/// Keys below 2048 bits are considered insecure.
+/// The smallest RSA modulus size (in bits) this library will generate, sign
+/// with or verify against. Keys below 2048 bits are considered insecure.
 const MIN_RSA_KEY_SIZE: usize = 2048;
+
+/// Rejects a parsed key whose modulus is smaller than [`MIN_RSA_KEY_SIZE`].
+fn ensure_min_key_size(key: &impl PublicKeyParts) -> CasResult<()> {
+    if key.n().bits() < MIN_RSA_KEY_SIZE {
+        return Err(CasError::InvalidParameters);
+    }
+    Ok(())
+}
 
 pub struct CASRSA;
 
@@ -45,22 +54,26 @@ impl CASRSAEncryption for CASRSA {
 
     /// Sign the given hash with the provided private key of the RSA key pair.
     /// The parameter `hash` doesn't necessarily have to be a hash, it can be any data that you want to sign.
+    /// Returns [`CasError::InvalidPemKey`] if the key cannot be parsed and
+    /// [`CasError::InvalidParameters`] if its modulus is smaller than 2048 bits.
     fn sign(private_key: String, hash: Vec<u8>) -> CasResult<Vec<u8>> {
         let private_key =
             RsaPrivateKey::from_pkcs8_pem(&private_key).map_err(|_| CasError::InvalidPemKey)?;
+        ensure_min_key_size(&private_key)?;
         private_key
             .sign(Pkcs1v15Sign::new_unprefixed(), &hash)
             .map_err(|_| CasError::SigningFailed)
     }
 
-
     /// Verify the signature of the given hash with the provided public key of the RSA key pair.
     /// The parameter `hash` doesn't necessarily have to be a hash, it can be any data that you want to verify.
-    /// Returns `Ok(true)` if the signature is valid, `Ok(false)` if it is not, and an
-    /// error if the public key could not be parsed.
+    /// Returns `Ok(true)` if the signature is valid and `Ok(false)` if it is not.
+    /// Returns [`CasError::InvalidPemKey`] if the public key could not be parsed and
+    /// [`CasError::InvalidParameters`] if its modulus is smaller than 2048 bits.
     fn verify(public_key: String, hash: Vec<u8>, signature: Vec<u8>) -> CasResult<bool> {
         let public_key =
             RsaPublicKey::from_pkcs1_pem(&public_key).map_err(|_| CasError::InvalidPemKey)?;
+        ensure_min_key_size(&public_key)?;
         Ok(public_key
             .verify(Pkcs1v15Sign::new_unprefixed(), &hash, &signature)
             .is_ok())
