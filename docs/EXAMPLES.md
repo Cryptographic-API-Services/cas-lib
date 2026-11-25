@@ -795,10 +795,58 @@ fn main() {
 
 ## Asymmetric (RSA)
 
-The asymmetric module wraps RSA. Keys are PEM-encoded strings. Key sizes below
-2048 bits are rejected: `generate_rsa_keys` refuses them, and `sign` / `verify`
-return `CasError::InvalidParameters` when given a smaller key's PEM. RSA here is used for signing and verifying a document's
-bytes; every operation returns a `Result`.
+The asymmetric module wraps RSA signatures. Keys are PEM-encoded strings: the
+private key is PKCS#8 and the public key is PKCS#1. `generate_rsa_keys` accepts
+2048, 3072 or 4096 bits, and every signing and verifying function returns
+`CasError::InvalidParameters` when given the PEM of a key smaller than 2048
+bits.
+
+Two signature schemes are offered. Both hash the message with SHA-256 inside
+the library, so pass the document itself (any length), not a digest of it:
+
+| Functions | Scheme | JWS name |
+|---|---|---|
+| `sign_pss` / `verify_pss` | RSASSA-PSS, SHA-256, MGF1-SHA-256, 32-byte salt. **Recommended for new designs.** Randomized: each signature differs. | `PS256` |
+| `sign` / `verify` | RSASSA-PKCS1-v1_5 with SHA-256. Deterministic. Use it to interoperate with RS256 verifiers such as OpenSSL (`openssl dgst -sha256 -verify`), WebCrypto (`RSASSA-PKCS1-v1_5`) and JWS. | `RS256` |
+
+`verify` and `verify_pss` return `Ok(false)` for a signature that does not
+match, and an error only for a key that cannot be used.
+
+> **Breaking change after 0.4.** Up to 0.4, `sign` / `verify` padded the
+> caller's bytes with no `DigestInfo` prefix and did not hash them. Signatures
+> made that way do not verify with the current `verify`; re-sign the data.
+
+### RSASSA-PSS (PS256)
+
+```rust
+use cas_lib::asymmetric::{
+    cas_rsa::CASRSA,
+    types::{CASRSAEncryption, RSAKeyPairResult},
+};
+
+fn main() {
+    // Generate a 3072-bit RSA key pair (PEM-encoded strings).
+    let key_pair: RSAKeyPairResult = CASRSA::generate_rsa_keys(3072).unwrap();
+
+    // Read the document to sign.
+    let document: Vec<u8> = std::fs::read("contract.pdf").unwrap();
+
+    // Sign with the private key. The document is hashed with SHA-256 inside.
+    let signature = CASRSA::sign_pss(key_pair.private_key, document.clone()).unwrap();
+
+    // Verify with the public key -> true when the document is unmodified.
+    let is_valid = CASRSA::verify_pss(key_pair.public_key.clone(), document.clone(), signature.clone()).unwrap();
+    println!("signature valid: {}", is_valid); // true
+
+    // A modified document gives Ok(false), not an error.
+    let mut tampered = document;
+    tampered.push(0);
+    let is_valid = CASRSA::verify_pss(key_pair.public_key, tampered, signature).unwrap();
+    println!("tampered valid: {}", is_valid); // false
+}
+```
+
+### RSASSA-PKCS1-v1_5 (RS256)
 
 ```rust
 use cas_lib::asymmetric::{
@@ -813,7 +861,8 @@ fn main() {
     // Read the document to sign.
     let document: Vec<u8> = std::fs::read("contract.pdf").unwrap();
 
-    // Sign with the private key.
+    // Sign with the private key. The document is hashed with SHA-256 inside,
+    // and the signature is a standard RS256 signature.
     let signature = CASRSA::sign(key_pair.private_key, document.clone()).unwrap();
 
     // Verify with the public key -> true when the document is unmodified.

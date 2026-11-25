@@ -549,59 +549,48 @@ mod ml_kem_1024 {
 }
 
 // ---------------------------------------------------------------------------
-// RSA (RSASSA-PKCS1-v1_5)
+// RSA (RSASSA-PKCS1-v1_5 and RSASSA-PSS with SHA-256)
 // ---------------------------------------------------------------------------
 
-/// `CASRSA` signs and verifies with `Pkcs1v15Sign::new_unprefixed()`: the caller
-/// supplies the fully encoded `DigestInfo` (ASN.1 prefix || digest) and the
-/// library applies the PKCS#1 v1.5 padding. Building that `DigestInfo` here
-/// from each vector's `msg` makes the standard RSASSA-PKCS1-v1_5 vectors apply.
-mod rsa_pkcs1v15 {
+/// `CASRSA::sign` / `verify` are RSASSA-PKCS1-v1_5 with SHA-256 (RS256) and
+/// `sign_pss` / `verify_pss` are RSASSA-PSS with SHA-256, MGF1-SHA-256 and a
+/// 32-byte salt (PS256). Both hash the message themselves, so each vector's
+/// `msg` is passed as is.
+mod rsa_signatures {
     use super::*;
     use cas_lib::asymmetric::{cas_rsa::CASRSA, types::CASRSAEncryption};
     use rsa::pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey};
-    use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
-    use rsa::{RsaPrivateKey, RsaPublicKey};
-    use sha2::{Digest, Sha224, Sha256, Sha384, Sha512};
+    use rsa::pkcs8::{DecodePrivateKey, LineEnding};
+    use rsa::{PrivateKey, PublicKey};
 
-    /// Returns the DER `DigestInfo` for `msg`, or `None` for a hash this test
-    /// does not build (SHA-1, SHA-512/t and SHA-3 groups are skipped).
-    fn digest_info(sha: &str, msg: &[u8]) -> Option<Vec<u8>> {
-        let (prefix, digest) = match sha {
-            "SHA-224" => ("302d300d06096086480165030402040500041c", Sha224::digest(msg).to_vec()),
-            "SHA-256" => ("3031300d060960864801650304020105000420", Sha256::digest(msg).to_vec()),
-            "SHA-384" => ("3041300d060960864801650304020205000430", Sha384::digest(msg).to_vec()),
-            "SHA-512" => ("3051300d060960864801650304020305000440", Sha512::digest(msg).to_vec()),
-            _ => return None,
-        };
-        let mut encoded = decode_hex(prefix);
-        encoded.extend(digest);
-        Some(encoded)
+    type VerifyFn = fn(String, Vec<u8>, Vec<u8>) -> CasResult<bool>;
+
+    /// The library takes a PKCS#1 PEM public key; `publicKeyAsn` is the PKCS#1
+    /// DER encoding of the same key.
+    fn public_key_pem(group: &Value) -> String {
+        PublicKey::from_pkcs1_der(&hex_field(group, "publicKeyAsn"))
+            .expect("PKCS#1 public key")
+            .to_pkcs1_pem(LineEnding::LF)
+            .expect("PEM encoding")
     }
 
+    /// Runs a verify file whose groups all match the scheme under test.
+    ///
     /// - `valid` signatures must verify.
     /// - `invalid` signatures must not.
     /// - `acceptable` cases are legacy encodings (e.g. a `DigestInfo` without
     ///   the NULL parameter) that implementations may accept or reject.
-    fn run_verify(file_name: &str) {
+    fn run_verify(file_name: &str, verify: VerifyFn, check_group: fn(&Value)) {
         let file = load(file_name);
         let mut tally = Tally::new(file_name, &file);
 
         for group in groups(&file) {
-            // The library takes a PKCS#1 PEM public key; `publicKeyAsn` is the
-            // PKCS#1 DER encoding of the same key.
-            let public_key = RsaPublicKey::from_pkcs1_der(&hex_field(group, "publicKeyAsn"))
-                .expect("PKCS#1 public key")
-                .to_pkcs1_pem(LineEnding::LF)
-                .expect("PEM encoding");
+            check_group(group);
+            let public_key = public_key_pem(group);
 
             for test in tests(group) {
-                let Some(encoded) = digest_info(str_field(group, "sha"), &hex_field(test, "msg")) else {
-                    tally.skipped += 1;
-                    continue;
-                };
                 tally.run += 1;
-                let verified = CASRSA::verify(public_key.clone(), encoded, hex_field(test, "sig"))
+                let verified = verify(public_key.clone(), hex_field(test, "msg"), hex_field(test, "sig"))
                     .unwrap_or(false);
 
                 match str_field(test, "result") {
@@ -616,59 +605,113 @@ mod rsa_pkcs1v15 {
         tally.finish();
     }
 
-    /// PKCS#1 v1.5 signing is deterministic, so every case must reproduce the
-    /// expected signature byte for byte.
-    fn run_sign(file_name: &str) {
+    /// Runs a verify file made for different parameters (another hash or salt
+    /// length). Its `valid` signatures are correct for those parameters, so
+    /// none of them may verify under the scheme under test. Its `invalid` and
+    /// `acceptable` cases are skipped: some are deliberately correct
+    /// signatures for the parameters under test (e.g. "hashed with SHA-256
+    /// instead of SHA-224").
+    fn run_verify_rejects_valid(file_name: &str, verify: VerifyFn) {
         let file = load(file_name);
         let mut tally = Tally::new(file_name, &file);
 
         for group in groups(&file) {
-            // The library takes a PKCS#8 PEM private key.
-            let private_key = RsaPrivateKey::from_pkcs8_der(&hex_field(group, "privateKeyPkcs8"))
-                .expect("PKCS#8 private key")
-                .to_pkcs8_pem(LineEnding::LF)
-                .expect("PEM encoding")
-                .to_string();
-
+            let public_key = public_key_pem(group);
             for test in tests(group) {
-                let Some(encoded) = digest_info(str_field(group, "sha"), &hex_field(test, "msg")) else {
+                if str_field(test, "result") != "valid" {
                     tally.skipped += 1;
                     continue;
-                };
+                }
                 tally.run += 1;
-                let signature = CASRSA::sign(private_key.clone(), encoded);
-                tally.check(signature == Ok(hex_field(test, "sig")), test, "signature mismatch");
+                let verified = verify(public_key.clone(), hex_field(test, "msg"), hex_field(test, "sig"))
+                    .unwrap_or(false);
+                tally.check(!verified, test, "signature for other parameters accepted");
             }
         }
 
         tally.finish();
     }
 
-    #[test]
-    fn rsa_2048_verify_vectors() {
-        for sha in ["sha224", "sha256", "sha384", "sha512"] {
-            run_verify(&format!("rsa_signature_2048_{sha}_test.json"));
-        }
+    fn rs256_group(group: &Value) {
+        assert_eq!(str_field(group, "sha"), "SHA-256");
+    }
+
+    fn ps256_group(group: &Value) {
+        assert_eq!(str_field(group, "sha"), "SHA-256");
+        assert_eq!(str_field(group, "mgf"), "MGF1");
+        assert_eq!(str_field(group, "mgfSha"), "SHA-256");
+        assert_eq!(int_field(group, "sLen"), 32);
     }
 
     #[test]
-    fn rsa_3072_verify_vectors() {
-        for sha in ["sha256", "sha384", "sha512"] {
-            run_verify(&format!("rsa_signature_3072_{sha}_test.json"));
+    fn rs256_verify_vectors() {
+        for bits in [2048, 3072, 4096, 8192] {
+            run_verify(&format!("rsa_signature_{bits}_sha256_test.json"), CASRSA::verify, rs256_group);
         }
     }
 
+    /// A signature made with another hash carries that hash's `DigestInfo`,
+    /// so RS256 verification must reject it.
     #[test]
-    fn rsa_4096_verify_vectors() {
-        for sha in ["sha256", "sha384", "sha512"] {
-            run_verify(&format!("rsa_signature_4096_{sha}_test.json"));
+    fn rs256_rejects_other_hashes() {
+        for sha in ["sha224", "sha384", "sha512"] {
+            run_verify_rejects_valid(&format!("rsa_signature_2048_{sha}_test.json"), CASRSA::verify);
         }
     }
 
+    /// PKCS#1 v1.5 signing is deterministic, so every SHA-256 case must
+    /// reproduce the expected signature byte for byte.
+    ///
+    /// Skipped: groups for other hashes, and groups whose key `rsa` 0.10
+    /// refuses to decode (the e = 3 keys with unbalanced 1364/684-bit primes).
+    /// Signing with such a key must fail cleanly with `InvalidPemKey`.
     #[test]
-    fn rsa_sign_vectors() {
+    fn rs256_sign_vectors() {
         for bits in [2048, 3072, 4096] {
-            run_sign(&format!("rsa_pkcs1_{bits}_sig_gen_test.json"));
+            let file_name = format!("rsa_pkcs1_{bits}_sig_gen_test.json");
+            let file = load(&file_name);
+            let mut tally = Tally::new(&file_name, &file);
+
+            for group in groups(&file) {
+                if str_field(group, "sha") != "SHA-256" {
+                    tally.skipped += tests(group).len();
+                    continue;
+                }
+                // The library takes a PKCS#8 PEM private key.
+                let der = hex_field(group, "privateKeyPkcs8");
+                let private_key = rsa::pkcs8::der::pem::encode_string("PRIVATE KEY", LineEnding::LF, &der)
+                    .expect("PEM encoding");
+                if PrivateKey::from_pkcs8_der(&der).is_err() {
+                    assert_eq!(
+                        CASRSA::sign(private_key, b"msg".to_vec()),
+                        Err(cas_lib::error::CasError::InvalidPemKey)
+                    );
+                    tally.skipped += tests(group).len();
+                    continue;
+                }
+
+                for test in tests(group) {
+                    tally.run += 1;
+                    let signature = CASRSA::sign(private_key.clone(), hex_field(test, "msg"));
+                    tally.check(signature == Ok(hex_field(test, "sig")), test, "signature mismatch");
+                }
+            }
+
+            tally.finish();
         }
+    }
+
+    #[test]
+    fn ps256_verify_vectors() {
+        for bits in [2048, 3072, 4096] {
+            run_verify(&format!("rsa_pss_{bits}_sha256_mgf1_32_test.json"), CASRSA::verify_pss, ps256_group);
+        }
+    }
+
+    /// `verify_pss` requires a 32-byte salt, so signatures with no salt must
+    /// not verify.
+    #[test]
+    fn ps256_rejects_other_salt_lengths() {
+        run_verify_rejects_valid("rsa_pss_2048_sha256_mgf1_0_test.json", CASRSA::verify_pss);
     }
 }
