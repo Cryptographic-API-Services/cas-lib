@@ -1,0 +1,3 @@
+# bcrypt known-answer vectors: `<password> <hash>`, one per line.
+# Source: Python's bcrypt, as used in the Rust `bcrypt` crate's tests.
+correctbatteryhorsestapler $2b$04$EGdrhbKUv8Oc9vGiXX0HQOxSg445d458Muh7DAHskb6QbtCvdxcie

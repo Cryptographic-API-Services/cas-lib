@@ -1,30 +1,109 @@
-name: Rust
+# Release pipeline (release-plz). See release-plz.toml for the flow.
+#
+# The file keeps its old name on purpose: the crates.io trusted publisher for
+# cas-lib is bound to `publish-main.yml`, and renaming it would break publishing.
+#
+# Hardening (#106):
+# - The workflow grants nothing by default. Each job asks for what it needs, and
+#   only the `release` job can mint an OIDC token (`id-token: write`).
+# - Build and test run in `test`, which has read-only access. `release` runs no
+#   build: it only packages and uploads (`publish_no_verify` in release-plz.toml).
+# - `release` runs only when Cargo.toml has a version crates.io doesn't have, and
+#   in the `release` environment, so required reviewers can gate every publish.
+# - Actions are pinned to commit SHAs, every cargo step uses --locked, and the
+#   toolchain is pinned in rust-toolchain.toml.
+name: Release
 
 on:
   push:
     branches: [ "main" ]
 
-permissions:
-  contents: read
-  id-token: write # required for crates.io trusted publishing (OIDC)
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  test:
+    name: Test and package
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+    outputs:
+      unpublished: ${{ steps.version.outputs.unpublished }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --release --verbose
-    - name: Test
-      run: cargo test --release --verbose
-    - uses: rust-lang/crates-io-auth-action@v1
-      id: auth
-    - name: Publish
-      run: cargo publish
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Test
+        run: cargo test --release --locked
+      - name: Package
+        run: cargo package --locked
+      - name: Check whether this version is already on crates.io
+        id: version
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 --locked | jq -r '.packages[] | select(.name == "cas-lib") | .version')
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -A 'cas-lib release workflow' \
+            "https://crates.io/api/v1/crates/cas-lib/${version}")
+          case "$status" in
+            200) echo "cas-lib ${version} is already published"; echo "unpublished=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "cas-lib ${version} is not published yet"; echo "unpublished=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::crates.io returned HTTP ${status} for cas-lib ${version}"; exit 1 ;;
+          esac
+
+  release:
+    name: Publish to crates.io
+    needs: test
+    if: needs.test.outputs.unpublished == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write   # push the v<version> tag and create the GitHub Release
+      pull-requests: read
+      id-token: write   # crates.io trusted publishing; no other job has this
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Publish, tag and create the GitHub Release
+        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-pr:
+    name: Open or update the release PR
+    needs: [test, release]
+    # Run after a publish, or when there was nothing to publish.
+    if: ${{ !cancelled() && needs.test.result == 'success' && needs.release.result != 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Open or update the release PR
+        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
+        with:
+          command: release-pr
+        env:
+          # A PR opened with the default GITHUB_TOKEN doesn't trigger the PR
+          # workflows. Set the RELEASE_PLZ_TOKEN secret (GitHub App or
+          # fine-grained PAT with Contents and Pull requests read/write) so CI
+          # runs on release PRs.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}

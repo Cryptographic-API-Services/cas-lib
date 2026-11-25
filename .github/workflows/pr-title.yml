@@ -1,0 +1,26 @@
+# PRs are squash-merged, so the PR title becomes the commit message that
+# release-plz turns into a CHANGELOG.md line and uses to choose the version bump.
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  conventional-commit:
+    name: Conventional Commits title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|security|changed|deprecated|docs|perf|refactor|test|ci|build|chore|revert)(\([A-Za-z0-9._/#-]+\))?!?: .+'
+          if printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "OK: $TITLE"
+          else
+            echo "::error::PR title must follow Conventional Commits, e.g. 'fix(rsa): reject keys under 2048 bits' or 'feat!: ...' for a breaking change. Got: $TITLE"
+            exit 1
+          fi

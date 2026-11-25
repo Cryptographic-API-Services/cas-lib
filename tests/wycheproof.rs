@@ -224,8 +224,33 @@ mod aes_gcm_siv {
     use super::*;
     use cas_lib::symmetric::aes_gcm_siv::{CASAES128SIV, CASAES256SIV};
     use cas_lib::symmetric::cas_symmetric_encryption::{
-        CASAES128SIVEncryption, CASAES256SIVEncryption,
+        CASAES128SIVAadEncryption, CASAES128SIVEncryption, CASAES256SIVAadEncryption,
+        CASAES256SIVEncryption,
     };
+
+    /// The AAD API can express every 96-bit-nonce case for AES-128 and AES-256.
+    #[test]
+    fn aes_gcm_siv_aad_api_vectors() {
+        run_aead(
+            "aes_gcm_siv_test.json",
+            &[
+                AeadCipher {
+                    key_bits: 128,
+                    nonce_bits: 96,
+                    supports_aad: true,
+                    encrypt: &|k, n, d, aad| CASAES128SIV::encrypt_plaintext_with_aad(k, n, d, aad),
+                    decrypt: &|k, n, d, aad| CASAES128SIV::decrypt_ciphertext_with_aad(k, n, d, aad),
+                },
+                AeadCipher {
+                    key_bits: 256,
+                    nonce_bits: 96,
+                    supports_aad: true,
+                    encrypt: &|k, n, d, aad| CASAES256SIV::encrypt_plaintext_with_aad(k, n, d, aad),
+                    decrypt: &|k, n, d, aad| CASAES256SIV::decrypt_ciphertext_with_aad(k, n, d, aad),
+                },
+            ],
+        );
+    }
 
     #[test]
     fn aes_gcm_siv_vectors() {
@@ -253,8 +278,24 @@ mod aes_gcm_siv {
 
 mod chacha20_poly1305 {
     use super::*;
-    use cas_lib::symmetric::cas_symmetric_encryption::Chacha20Poly1305Encryption;
+    use cas_lib::symmetric::cas_symmetric_encryption::{
+        Chacha20Poly1305AadEncryption, Chacha20Poly1305Encryption,
+    };
     use cas_lib::symmetric::chacha20poly1305::CASChacha20Poly1305;
+
+    #[test]
+    fn chacha20_poly1305_aad_api_vectors() {
+        run_aead(
+            "chacha20_poly1305_test.json",
+            &[AeadCipher {
+                key_bits: 256,
+                nonce_bits: 96,
+                supports_aad: true,
+                encrypt: &|k, n, d, aad| CASChacha20Poly1305::encrypt_plaintext_with_aad(k, n, d, aad),
+                decrypt: &|k, n, d, aad| CASChacha20Poly1305::decrypt_ciphertext_with_aad(k, n, d, aad),
+            }],
+        );
+    }
 
     #[test]
     fn chacha20_poly1305_vectors() {
@@ -274,7 +315,22 @@ mod chacha20_poly1305 {
 mod ascon_aead128 {
     use super::*;
     use cas_lib::sponges::ascon_aead::AsconAead;
-    use cas_lib::sponges::cas_ascon_aead::CASAsconAead;
+    use cas_lib::sponges::cas_ascon_aead::{CASAsconAead, CASAsconAeadAad};
+
+    /// NIST SP 800-232 Ascon-AEAD128 through the AAD API.
+    #[test]
+    fn ascon_aead128_aad_api_vectors() {
+        run_aead(
+            "ascon_sp800_232_aead128_test.json",
+            &[AeadCipher {
+                key_bits: 128,
+                nonce_bits: 128,
+                supports_aad: true,
+                encrypt: &|k, n, d, aad| AsconAead::encrypt_plaintext_with_aad(k, n, d, aad),
+                decrypt: &|k, n, d, aad| AsconAead::decrypt_ciphertext_with_aad(k, n, d, aad),
+            }],
+        );
+    }
 
     /// NIST SP 800-232 Ascon-AEAD128.
     #[test]

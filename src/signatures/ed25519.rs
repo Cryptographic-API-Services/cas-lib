@@ -6,13 +6,30 @@ extern crate rand;
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use ed25519_dalek::Signature;
 use rand::rngs::OsRng;
+use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
 use crate::signatures::cas_ed25519::Ed25519ByteKeyPair;
 use super::cas_ed25519::Ed25519ByteSignature;
 
+/// Copies a caller-supplied 32-byte Ed25519 secret key into a buffer that is
+/// zeroized on drop, and zeroizes the caller's `Vec` as well.
+/// `SigningKey` itself zeroizes on drop (ed25519-dalek's `zeroize` feature).
+fn secret_key_bytes(key_pair: Vec<u8>) -> CasResult<Zeroizing<[u8; 32]>> {
+    let key_pair = Zeroizing::new(key_pair);
+    let mut bytes = Zeroizing::new([0u8; 32]);
+    if key_pair.len() != bytes.len() {
+        return Err(CasError::InvalidKey);
+    }
+    bytes.copy_from_slice(&key_pair);
+    Ok(bytes)
+}
+
 /// Generates a new Ed25519 key pair.
 /// Returns the key pair as a vector of bytes.
+///
+/// `key_pair` is the secret key, owned by the caller, who must zeroize it when done
+/// (FFI layers: before freeing it). See the crate-level docs.
 pub fn get_ed25519_key_pair() -> Ed25519ByteKeyPair {
     let mut csprng = OsRng;
     let keypair = SigningKey::generate(&mut csprng);
@@ -28,7 +45,7 @@ pub fn get_ed25519_key_pair() -> Ed25519ByteKeyPair {
 /// Returns the signature and public key as an Ed25519ByteSignature, or an error
 /// if the key pair is not 32 bytes long.
 pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -> CasResult<Ed25519ByteSignature> {
-    let key_pair_bytes: [u8; 32] = key_pair.try_into().map_err(|_| CasError::InvalidKey)?;
+    let key_pair_bytes = secret_key_bytes(key_pair)?;
 
     let keypair = SigningKey::from_bytes(&key_pair_bytes);
     let signature = keypair.sign(&message_to_sign);
@@ -44,13 +61,15 @@ pub fn ed25519_sign_with_key_pair(key_pair: Vec<u8>, message_to_sign: Vec<u8>) -
 /// Returns `Ok(true)` if the signature is valid, `Ok(false)` if it is not, and
 /// an error if the key pair or signature has an invalid length.
 /// The key pair is expected to be in byte array format.
+/// Uses strict verification (rejects small-order R and weak keys), exactly
+/// like `ed25519_verify_with_public_key`.
 pub fn ed25519_verify_with_key_pair(key_pair: Vec<u8>, signature: Vec<u8>, message: Vec<u8>) -> CasResult<bool> {
-    let key_pair_bytes: [u8; 32] = key_pair.try_into().map_err(|_| CasError::InvalidKey)?;
+    let key_pair_bytes = secret_key_bytes(key_pair)?;
     let signature_bytes: [u8; 64] = signature.try_into().map_err(|_| CasError::InvalidSignature)?;
 
     let keypair = SigningKey::from_bytes(&key_pair_bytes);
     let signature = Signature::from_bytes(&signature_bytes);
-    Ok(keypair.verify(&message, &signature).is_ok())
+    Ok(keypair.verifying_key().verify_strict(&message, &signature).is_ok())
 }
 
 /// Verifies a signature using the provided public key.

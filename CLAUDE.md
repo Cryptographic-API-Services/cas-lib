@@ -60,7 +60,9 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 
 - Binary inputs/outputs use `Vec<u8>`.
 - Asymmetric keys are PEM-encoded strings.
-- Nonces/IVs are generated internally via `OsRng` — callers do not supply them.
+- Every AEAD (AES-GCM, AES-GCM-SIV, ChaCha20-Poly1305, Ascon-AEAD) implements `CASAeadSeal` (`symmetric/cas_symmetric_encryption.rs`): `seal` draws the nonce internally via `OsRng` and returns `nonce || ciphertext || tag`, and `open` splits it back apart. Both take optional AAD. This is the recommended API.
+- The older `encrypt_plaintext` / `decrypt_ciphertext` (Ascon: `encrypt` / `decrypt`) and `*_with_aad` functions take a caller-supplied nonce (from `generate_nonce`); the caller must never reuse a nonce under the same key, and each such function documents that risk. Every AEAD has an `*_with_aad` variant; HPKE `encrypt` / `decrypt` take an `aad` argument.
+- Secret key material: zeroize intermediate secret buffers the crate allocates (use `zeroize::Zeroizing`; to return such a buffer without a copy, `std::mem::take(&mut *buf)`). Returned secrets stay plain `Vec<u8>`/`String` owned by the caller: the FFI binding layers must zero them before freeing. Structs holding secrets must not derive `Debug`; write a `Debug` impl that redacts the secret fields (see `src/pqc/cas_pqc.rs`).
 - Fallible operations return `CasResult<T>` (`Result<T, CasError>` from [src/error.rs](src/error.rs)) rather than panicking — a panic unwinding across the FFI boundary is undefined behavior. Infallible operations (e.g. hashing in `hashers`) return their value directly. The `CasError` variants map to stable numeric codes consumed by the FFI binding crates; that mapping is an append-only ABI contract (see the doc comment on `CasError`).
 
 ### Test Vectors
@@ -73,9 +75,11 @@ Project Wycheproof vectors are **not** committed. [tests/common/wycheproof.rs](t
 
 Usage examples for every public API live in [docs/EXAMPLES.md](docs/EXAMPLES.md). **Whenever you add, change, or remove a public API (a new algorithm, a new trait method or free function, a changed signature or return type), update the examples in the same change**: add a complete, runnable `fn main()` example for anything new, fix any example that no longer compiles, and keep the Table of Contents in sync. Examples must use the real module paths and handle `CasResult` (e.g. `.unwrap()` or `?`) so they compile when pasted into a fresh crate that depends on `cas-lib`.
 
-### CI
+### CI and releases
 
-- PRs run `cargo build --release` and `cargo test --release` on Linux, Windows, and macOS (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`, `.github/workflows/macos-pr.yml`).
-- Pushes to `main` trigger an automatic `cargo publish` (`.github/workflows/publish-main.yml`).
+- The toolchain is pinned in [rust-toolchain.toml](rust-toolchain.toml); rustup installs it on first use. Every workflow runs cargo with `--locked`, and actions are pinned to commit SHAs (keep the `# vX.Y.Z` comment when bumping one).
+- PRs run `cargo build --release --locked` and `cargo test --release --locked` on Linux, Windows, and macOS (`.github/workflows/linux-pr.yml`, `.github/workflows/windows-pr.yml`, `.github/workflows/macos-pr.yml`).
+- **PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/)** (`.github/workflows/pr-title.yml`). PRs are squash-merged, so the title becomes the commit that release-plz turns into a `CHANGELOG.md` line: `feat:` → Added, `fix:` → Fixed, `security:` → Security, `docs:` → Documentation, anything else → Other. Use `!` (e.g. `feat!:`) for a breaking change.
+- Releases use [release-plz](https://release-plz.dev) (`release-plz.toml`, `.github/workflows/publish-main.yml`). Each push to `main` tests and packages the crate, publishes to crates.io only if the `Cargo.toml` version isn't published yet (then tags `v<version>` and creates a GitHub Release from the `CHANGELOG.md` entry), and opens or updates a release PR that bumps the version and writes the changelog. **Don't bump the version or edit `CHANGELOG.md` by hand in feature PRs**; merge the release PR instead. `publish-main.yml` keeps that name because the crates.io trusted publisher is bound to it.
 
 The dev profile sets `opt-level = 3` for `num-bigint-dig` (used by the RSA crate) to keep RSA key-generation fast during local development.

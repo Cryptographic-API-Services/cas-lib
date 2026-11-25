@@ -182,7 +182,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cas-lib"
-version = "0.2.95"
+version = "0.3.0"
 dependencies = [
  "aes-gcm",
  "aes-gcm-siv",
@@ -192,6 +192,7 @@ dependencies = [
  "bcrypt",
  "blake2",
  "chacha20poly1305",
+ "curve25519-dalek",
  "ed25519-dalek",
  "hkdf",
  "hmac",
@@ -206,8 +207,10 @@ dependencies = [
  "sha2",
  "sha3",
  "slh-dsa",
+ "subtle",
  "uuid",
  "x25519-dalek",
+ "zeroize",
  "zstd",
 ]
 
