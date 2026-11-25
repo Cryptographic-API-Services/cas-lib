@@ -36,7 +36,7 @@ hpke = { version = "0.12.0", default-features = false, features = ["alloc", "x25
 uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.12.2"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-hkdf = "0.12.4"
+hkdf = "0.13.0"
 chacha20poly1305 = "0.10.1"
 slh-dsa = "0.0.3"  
 ml-kem = "0.2.1"
