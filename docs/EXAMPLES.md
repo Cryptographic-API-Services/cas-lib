@@ -170,11 +170,143 @@ fn main() {
 ## Symmetric
 
 The symmetric module exposes AES-128-GCM, AES-256-GCM, AES-128/256-GCM-SIV,
-ChaCha20-Poly1305, and AES key wrapping.
-Nonces and keys are generated for you via `OsRng` — you never supply them
-yourself. `encrypt_plaintext` returns the ciphertext with the authentication tag
-appended; pass that same output back to `decrypt_ciphertext`. Each operation
-returns a `Result`, so handle the error (here with `.unwrap()`).
+ChaCha20-Poly1305, and AES key wrapping. Keys come from `generate_key` (via
+`OsRng`). Each operation returns a `Result`, so handle the error (here with
+`.unwrap()`).
+
+There are two ways to encrypt with an AEAD:
+
+- **`seal` / `open` (recommended).** Every AEAD implements the `CASAeadSeal`
+  trait. `seal` draws a fresh random nonce for every call and returns
+  `nonce || ciphertext || tag`; `open` splits that blob apart and decrypts it.
+  You never handle a nonce, so you cannot reuse one by mistake. See
+  [Seal and open](#seal-and-open-recommended).
+- **Caller-supplied nonce.** `encrypt_plaintext` / `decrypt_ciphertext` and the
+  `*_with_aad` variants take a nonce you generate with `generate_nonce` and
+  must store next to the ciphertext. `encrypt_plaintext` returns the ciphertext
+  with the authentication tag appended; pass that same output back to
+  `decrypt_ciphertext`. **Never reuse a nonce with the same key:** for AES-GCM
+  and ChaCha20-Poly1305 that reveals the XOR of the two plaintexts and lets an
+  attacker forge messages.
+
+### Seal and open (recommended)
+
+`seal(key, plaintext, aad)` and `open(key, sealed, aad)` work the same way for
+every AEAD. `aad` is optional additional authenticated data: it is not
+encrypted or stored in the output, but `open` fails unless it gets the same
+value. `None` is the same as empty AAD. `NONCE_LEN` gives the length of the
+nonce prefix. `open` rejects a blob that is too short to hold a nonce and a tag
+with `CasError::InvalidInput`, and a tampered blob or wrong AAD with
+`CasError::DecryptionFailed`.
+
+AES-256-GCM:
+
+```rust
+use cas_lib::error::CasError;
+use cas_lib::symmetric::{
+    aes::CASAES256,
+    cas_symmetric_encryption::{CASAES256Encryption, CASAeadSeal},
+};
+
+fn main() {
+    let key = <CASAES256 as CASAES256Encryption>::generate_key();
+    let plaintext = b"attack at dawn".to_vec();
+    let aad = b"message-id:42".to_vec();
+
+    // The nonce is generated internally and prepended to the output.
+    let sealed = CASAES256::seal(key.clone(), plaintext.clone(), Some(aad.clone())).unwrap();
+    assert_eq!(sealed.len(), CASAES256::NONCE_LEN + plaintext.len() + 16);
+
+    let opened = CASAES256::open(key.clone(), sealed.clone(), Some(aad)).unwrap();
+    assert_eq!(opened, plaintext);
+
+    // Different AAD, or none at all, is rejected.
+    let wrong_aad = CASAES256::open(key.clone(), sealed.clone(), Some(b"message-id:43".to_vec()));
+    assert_eq!(wrong_aad, Err(CasError::DecryptionFailed));
+    assert!(CASAES256::open(key.clone(), sealed, None).is_err());
+
+    // Sealing the same message twice gives different output: a new nonce each time.
+    let a = CASAES256::seal(key.clone(), plaintext.clone(), None).unwrap();
+    let b = CASAES256::seal(key, plaintext, None).unwrap();
+    assert_ne!(a, b);
+}
+```
+
+AES-128-GCM, with the sealed blob written to and read back from a file:
+
+```rust
+use cas_lib::symmetric::{
+    aes::CASAES128,
+    cas_symmetric_encryption::{CASAES128Encryption, CASAeadSeal},
+};
+
+fn main() {
+    let key = <CASAES128 as CASAES128Encryption>::generate_key();
+    let plaintext = b"quarterly numbers".to_vec();
+
+    // The blob carries its own nonce, so it is all you need to store.
+    let sealed = CASAES128::seal(key.clone(), plaintext.clone(), None).unwrap();
+    std::fs::write("sealed.bin", &sealed).unwrap();
+
+    let from_disk = std::fs::read("sealed.bin").unwrap();
+    let opened = CASAES128::open(key, from_disk, None).unwrap();
+    assert_eq!(opened, plaintext);
+}
+```
+
+AES-256-GCM-SIV and AES-128-GCM-SIV:
+
+```rust
+use cas_lib::symmetric::{
+    aes_gcm_siv::{CASAES128SIV, CASAES256SIV},
+    cas_symmetric_encryption::{CASAES128SIVEncryption, CASAES256SIVEncryption, CASAeadSeal},
+};
+
+fn main() {
+    let plaintext = b"database row 17".to_vec();
+    let aad = b"table:users".to_vec();
+
+    let key256 = <CASAES256SIV as CASAES256SIVEncryption>::generate_key();
+    let sealed = CASAES256SIV::seal(key256.clone(), plaintext.clone(), Some(aad.clone())).unwrap();
+    let opened = CASAES256SIV::open(key256, sealed, Some(aad.clone())).unwrap();
+    assert_eq!(opened, plaintext);
+
+    let key128 = <CASAES128SIV as CASAES128SIVEncryption>::generate_key();
+    let sealed = CASAES128SIV::seal(key128.clone(), plaintext.clone(), Some(aad.clone())).unwrap();
+    let opened = CASAES128SIV::open(key128, sealed, Some(aad)).unwrap();
+    assert_eq!(opened, plaintext);
+}
+```
+
+ChaCha20-Poly1305:
+
+```rust
+use cas_lib::symmetric::{
+    cas_symmetric_encryption::{CASAeadSeal, Chacha20Poly1305Encryption},
+    chacha20poly1305::CASChacha20Poly1305,
+};
+
+fn main() {
+    let key = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_key();
+    let plaintext = b"hello from chacha".to_vec();
+
+    let sealed = CASChacha20Poly1305::seal(key.clone(), plaintext.clone(), None).unwrap();
+    assert_eq!(sealed.len(), CASChacha20Poly1305::NONCE_LEN + plaintext.len() + 16);
+
+    let opened = CASChacha20Poly1305::open(key.clone(), sealed.clone(), None).unwrap();
+    assert_eq!(opened, plaintext);
+
+    // A truncated blob is an error, not a panic.
+    let truncated = sealed[..CASChacha20Poly1305::NONCE_LEN].to_vec();
+    assert!(CASChacha20Poly1305::open(key, truncated, None).is_err());
+}
+```
+
+Ascon-AEAD128 implements the same trait; see
+[Sponges (ASCON-AEAD)](#sponges-ascon-aead).
+
+A random 96-bit nonce is safe for about 2^32 messages under one key (AES-GCM,
+AES-GCM-SIV, ChaCha20-Poly1305). Rotate the key well before that.
 
 ### AES-256 GCM Mode
 ```rust
@@ -246,7 +378,8 @@ fn main() {
 Both AES types also implement the `CASAES256AadEncryption` / `CASAES128AadEncryption`
 traits, which take additional authenticated data (AAD). The AAD is not encrypted, but
 it is bound to the authentication tag: decryption only succeeds when the same AAD is
-supplied, so any tampering with it is detected.
+supplied, so any tampering with it is detected. These functions take a
+caller-supplied nonce; `seal` / `open` accept AAD too and manage the nonce for you.
 
 ```rust
 use cas_lib::symmetric::{
@@ -315,6 +448,47 @@ fn main() {
     file.write_all(&decrypted_bytes).unwrap();
 
     assert_eq!(file_bytes, decrypted_bytes);
+}
+```
+
+### ChaCha20-Poly1305 with AAD
+
+`CASChacha20Poly1305` also implements `Chacha20Poly1305AadEncryption`, which
+binds additional authenticated data under a caller-supplied nonce.
+
+```rust
+use cas_lib::symmetric::{
+    cas_symmetric_encryption::{Chacha20Poly1305AadEncryption, Chacha20Poly1305Encryption},
+    chacha20poly1305::CASChacha20Poly1305,
+};
+
+fn main() {
+    let key = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_key();
+    // Use a fresh nonce for every message encrypted under this key.
+    let nonce = <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_nonce();
+    let plaintext = b"payload".to_vec();
+    let aad = b"packet-header".to_vec();
+
+    let ciphertext = CASChacha20Poly1305::encrypt_plaintext_with_aad(
+        key.clone(),
+        nonce.clone(),
+        plaintext.clone(),
+        aad.clone(),
+    )
+    .unwrap();
+
+    // The wrong AAD fails authentication.
+    assert!(CASChacha20Poly1305::decrypt_ciphertext_with_aad(
+        key.clone(),
+        nonce.clone(),
+        ciphertext.clone(),
+        b"other-header".to_vec(),
+    )
+    .is_err());
+
+    let decrypted =
+        CASChacha20Poly1305::decrypt_ciphertext_with_aad(key, nonce, ciphertext, aad).unwrap();
+    assert_eq!(decrypted, plaintext);
 }
 ```
 
@@ -410,6 +584,53 @@ fn main() {
             .unwrap();
 
     assert_eq!(file_bytes, decrypted_bytes);
+}
+```
+
+#### AES-GCM-SIV with AAD
+
+`CASAES256SIV` / `CASAES128SIV` also implement `CASAES256SIVAadEncryption` /
+`CASAES128SIVAadEncryption`, which bind additional authenticated data under a
+caller-supplied nonce.
+
+```rust
+use cas_lib::symmetric::{
+    aes_gcm_siv::{CASAES128SIV, CASAES256SIV},
+    cas_symmetric_encryption::{
+        CASAES128SIVAadEncryption, CASAES128SIVEncryption, CASAES256SIVAadEncryption,
+        CASAES256SIVEncryption,
+    },
+};
+
+fn main() {
+    let plaintext = b"record body".to_vec();
+    let aad = b"record-id:9".to_vec();
+
+    let key = <CASAES256SIV as CASAES256SIVEncryption>::generate_key();
+    let nonce = <CASAES256SIV as CASAES256SIVEncryption>::generate_nonce();
+    let ciphertext = CASAES256SIV::encrypt_plaintext_with_aad(
+        key.clone(),
+        nonce.clone(),
+        plaintext.clone(),
+        aad.clone(),
+    )
+    .unwrap();
+    let decrypted =
+        CASAES256SIV::decrypt_ciphertext_with_aad(key, nonce, ciphertext, aad.clone()).unwrap();
+    assert_eq!(decrypted, plaintext);
+
+    let key = <CASAES128SIV as CASAES128SIVEncryption>::generate_key();
+    let nonce = <CASAES128SIV as CASAES128SIVEncryption>::generate_nonce();
+    let ciphertext = CASAES128SIV::encrypt_plaintext_with_aad(
+        key.clone(),
+        nonce.clone(),
+        plaintext.clone(),
+        aad,
+    )
+    .unwrap();
+    // The wrong AAD fails authentication.
+    assert!(CASAES128SIV::decrypt_ciphertext_with_aad(key, nonce, ciphertext, b"x".to_vec())
+        .is_err());
 }
 ```
 
@@ -712,6 +933,8 @@ The hybrid module implements HPKE (Hybrid Public Key Encryption). The recipient
 generates a key pair and an `info` string. A sender encrypts to the recipient's
 public key, producing an encapsulated key, the ciphertext, and an authentication
 tag. The recipient decrypts using their private key plus those three values.
+Both `encrypt` and `decrypt` take additional authenticated data (`aad`) as their
+last argument; pass an empty vector when there is none.
 
 ```rust
 use std::path::Path;
@@ -727,11 +950,12 @@ fn main() {
 
     // Sender encrypts to the recipient's public key.
     let (encapped_key, ciphertext, tag) =
-        CASHPKE::encrypt(file_bytes.clone(), public_key, info_str.clone()).unwrap();
+        CASHPKE::encrypt(file_bytes.clone(), public_key, info_str.clone(), Vec::new()).unwrap();
 
     // Recipient decrypts with their private key + the encapsulated key + tag.
     let decrypted_bytes =
-        CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info_str).unwrap();
+        CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info_str, Vec::new())
+            .unwrap();
 
     assert_eq!(file_bytes, decrypted_bytes);
     println!("hpke round-trip succeeded");
@@ -751,7 +975,7 @@ fn main() {
     let info = CASHPKE::generate_info_str();
 
     let (encapped_key, ciphertext, tag) =
-        CASHPKE::encrypt(b"hello".to_vec(), public_key, info.clone()).unwrap();
+        CASHPKE::encrypt(b"hello".to_vec(), public_key, info.clone(), Vec::new()).unwrap();
 
     // A mismatched info string is rejected.
     let wrong_info = CASHPKE::generate_info_str();
@@ -760,21 +984,81 @@ fn main() {
         private_key.clone(),
         encapped_key.clone(),
         tag.clone(),
-        wrong_info
+        wrong_info,
+        Vec::new()
     )
     .is_err());
 
-    let plaintext = CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info).unwrap();
+    let plaintext =
+        CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info, Vec::new()).unwrap();
     assert_eq!(plaintext, b"hello");
+}
+```
+
+`aad` binds data that travels in the clear, such as a message header or record
+id, to the ciphertext. It is not encrypted or returned by `encrypt`, so the
+recipient must already have it; decryption fails if it differs.
+
+```rust
+use cas_lib::error::CasError;
+use cas_lib::hybrid::{cas_hybrid::CASHybrid, hpke::CASHPKE};
+
+fn main() {
+    let (private_key, public_key, info) = CASHPKE::generate_key_pair();
+    let header = b"to:alice;msg-id:1001".to_vec();
+
+    let (encapped_key, ciphertext, tag) =
+        CASHPKE::encrypt(b"hello alice".to_vec(), public_key, info.clone(), header.clone())
+            .unwrap();
+
+    // A modified header is detected.
+    let tampered = CASHPKE::decrypt(
+        ciphertext.clone(),
+        private_key.clone(),
+        encapped_key.clone(),
+        tag.clone(),
+        info.clone(),
+        b"to:mallory;msg-id:1001".to_vec(),
+    );
+    assert_eq!(tampered, Err(CasError::DecryptionFailed));
+
+    let plaintext =
+        CASHPKE::decrypt(ciphertext, private_key, encapped_key, tag, info, header).unwrap();
+    assert_eq!(plaintext, b"hello alice");
 }
 ```
 
 
 ## Sponges (ASCON-AEAD)
 
-The sponges module provides ASCON-AEAD, a lightweight authenticated cipher. As
-with the symmetric module, the key and nonce are generated for you, and
-`encrypt` / `decrypt` round-trip the file bytes.
+The sponges module provides ASCON-AEAD (Ascon-AEAD128, NIST SP 800-232), a
+lightweight authenticated cipher with a 16-byte key and a 16-byte nonce. As
+with the symmetric module, `AsconAead` implements `CASAeadSeal`, so `seal` /
+`open` manage the nonce for you (recommended). `encrypt` / `decrypt` take a
+nonce from `generate_nonce` instead; never reuse a nonce with the same key.
+
+```rust
+use cas_lib::sponges::{ascon_aead::AsconAead, cas_ascon_aead::CASAsconAead};
+use cas_lib::symmetric::cas_symmetric_encryption::CASAeadSeal;
+
+fn main() {
+    let key = <AsconAead as CASAsconAead>::generate_key();
+    let plaintext = b"sensor reading 21.5C".to_vec();
+    let aad = b"device:7".to_vec();
+
+    // `nonce || ciphertext || tag`, with a fresh 16-byte nonce.
+    let sealed = AsconAead::seal(key.clone(), plaintext.clone(), Some(aad.clone())).unwrap();
+    assert_eq!(sealed.len(), AsconAead::NONCE_LEN + plaintext.len() + 16);
+
+    let opened = AsconAead::open(key.clone(), sealed.clone(), Some(aad)).unwrap();
+    assert_eq!(opened, plaintext);
+
+    // The wrong AAD is rejected.
+    assert!(AsconAead::open(key, sealed, Some(b"device:8".to_vec())).is_err());
+}
+```
+
+With a caller-supplied nonce:
 
 ```rust
 use std::{fs::File, io::Write, path::Path};
@@ -800,6 +1084,43 @@ fn main() {
     file.write_all(&decrypted_bytes).unwrap();
 
     assert_eq!(file_bytes, decrypted_bytes);
+}
+```
+
+`AsconAead` also implements `CASAsconAeadAad`, which binds additional
+authenticated data under a caller-supplied nonce:
+
+```rust
+use cas_lib::sponges::{
+    ascon_aead::AsconAead,
+    cas_ascon_aead::{CASAsconAead, CASAsconAeadAad},
+};
+
+fn main() {
+    let key = <AsconAead as CASAsconAead>::generate_key();
+    let nonce = <AsconAead as CASAsconAead>::generate_nonce();
+    let plaintext = b"firmware chunk 3".to_vec();
+    let aad = b"version:2.1".to_vec();
+
+    let ciphertext = AsconAead::encrypt_plaintext_with_aad(
+        key.clone(),
+        nonce.clone(),
+        plaintext.clone(),
+        aad.clone(),
+    )
+    .unwrap();
+
+    // The wrong AAD fails authentication.
+    assert!(AsconAead::decrypt_ciphertext_with_aad(
+        key.clone(),
+        nonce.clone(),
+        ciphertext.clone(),
+        b"version:2.2".to_vec(),
+    )
+    .is_err());
+
+    let decrypted = AsconAead::decrypt_ciphertext_with_aad(key, nonce, ciphertext, aad).unwrap();
+    assert_eq!(decrypted, plaintext);
 }
 ```
 
