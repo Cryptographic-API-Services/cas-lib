@@ -116,7 +116,7 @@ fn main() {
     println!("{}", hash);
     println!("verified: {}", CASBCrypt::verify_password(hash, password.clone()).unwrap()); // true
 
-    // Custom cost (4-31); each +1 doubles the work.
+    // Custom cost (10-16, see BCRYPT_MIN_COST / BCRYPT_MAX_COST); each +1 doubles the work.
     let hash = CASBCrypt::hash_password_customized(password.clone(), 10).unwrap();
     println!("verified: {}", CASBCrypt::verify_password(hash.clone(), password).unwrap()); // true
 
@@ -656,26 +656,54 @@ fn main() {
 
 Every AES type also offers `key_from_vec`, which validates an existing key
 (returning `CasError::InvalidKey` on the wrong length), and
-`key_from_x25519_shared_secret`, which runs HKDF-SHA256 over an
-[X25519](#key-exchange-x25519) shared secret to produce a key of the right size.
-This is how two parties turn a key exchange into a shared encryption key.
+`key_from_x25519_shared_secret`, which derives a key of the right size from an
+[X25519](#key-exchange-x25519) shared secret with HKDF-SHA256. This is how two
+parties turn a key exchange into a shared encryption key.
+
+`key_from_x25519_shared_secret(shared_secret, public_key_a, public_key_b)` takes
+the shared secret and **both** parties' 32-byte public keys, in either order (they
+are sorted internally, so each side can pass its own key first). The HKDF `info`
+is `"cas-lib/v1/x25519-hkdf-sha256/<cipher>" || 0x00 || min(pk_a, pk_b) || max(pk_a, pk_b)`,
+so:
+
+- the key is bound to the cipher and key size: the AES-128 key is not a prefix of
+  the AES-256 key, and AES-GCM and AES-GCM-SIV keys from one secret are unrelated;
+- the key is bound to the public keys: both peers get the same key only if they
+  saw the same two public keys.
+
+It returns `CasError::InvalidKey` if any input is not 32 bytes or the shared
+secret is all zeros. Keys derived by cas-lib 0.4 and earlier are different, so
+both peers must upgrade together.
+
+If you don't need to manage the exchange yourself, [HPKE](#hybrid-hpke) does the
+key exchange, key derivation and encryption in one step, with standard (RFC 9180)
+domain separation.
 
 ```rust
 use cas_lib::key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519};
 use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAES256Encryption};
 
 fn main() {
-    // Alice and Bob agree on a shared secret.
+    // Alice and Bob exchange public keys and agree on a shared secret.
     let alice = X25519::generate_secret_and_public_key();
     let bob = X25519::generate_secret_and_public_key();
-    let alice_shared = X25519::diffie_hellman(alice.secret_key, bob.public_key).unwrap();
-    let bob_shared = X25519::diffie_hellman(bob.secret_key, alice.public_key).unwrap();
+    let alice_shared = X25519::diffie_hellman(alice.secret_key, bob.public_key.clone()).unwrap();
+    let bob_shared = X25519::diffie_hellman(bob.secret_key, alice.public_key.clone()).unwrap();
 
-    // Each side derives the same AES-256 key from it.
-    let alice_key =
-        <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(alice_shared).unwrap();
-    let bob_key =
-        <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(bob_shared).unwrap();
+    // Each side derives the same AES-256 key, passing both public keys (own key
+    // first here; the order doesn't matter).
+    let alice_key = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(
+        alice_shared,
+        alice.public_key.clone(),
+        bob.public_key.clone(),
+    )
+    .unwrap();
+    let bob_key = <CASAES256 as CASAES256Encryption>::key_from_x25519_shared_secret(
+        bob_shared,
+        bob.public_key,
+        alice.public_key,
+    )
+    .unwrap();
     assert_eq!(alice_key, bob_key);
 
     // Alice encrypts, Bob decrypts. The nonce travels alongside the ciphertext.
@@ -795,10 +823,58 @@ fn main() {
 
 ## Asymmetric (RSA)
 
-The asymmetric module wraps RSA. Keys are PEM-encoded strings. Key sizes below
-2048 bits are rejected: `generate_rsa_keys` refuses them, and `sign` / `verify`
-return `CasError::InvalidParameters` when given a smaller key's PEM. RSA here is used for signing and verifying a document's
-bytes; every operation returns a `Result`.
+The asymmetric module wraps RSA signatures. Keys are PEM-encoded strings: the
+private key is PKCS#8 and the public key is PKCS#1. `generate_rsa_keys` accepts
+2048, 3072 or 4096 bits, and every signing and verifying function returns
+`CasError::InvalidParameters` when given the PEM of a key smaller than 2048
+bits.
+
+Two signature schemes are offered. Both hash the message with SHA-256 inside
+the library, so pass the document itself (any length), not a digest of it:
+
+| Functions | Scheme | JWS name |
+|---|---|---|
+| `sign_pss` / `verify_pss` | RSASSA-PSS, SHA-256, MGF1-SHA-256, 32-byte salt. **Recommended for new designs.** Randomized: each signature differs. | `PS256` |
+| `sign` / `verify` | RSASSA-PKCS1-v1_5 with SHA-256. Deterministic. Use it to interoperate with RS256 verifiers such as OpenSSL (`openssl dgst -sha256 -verify`), WebCrypto (`RSASSA-PKCS1-v1_5`) and JWS. | `RS256` |
+
+`verify` and `verify_pss` return `Ok(false)` for a signature that does not
+match, and an error only for a key that cannot be used.
+
+> **Breaking change after 0.4.** Up to 0.4, `sign` / `verify` padded the
+> caller's bytes with no `DigestInfo` prefix and did not hash them. Signatures
+> made that way do not verify with the current `verify`; re-sign the data.
+
+### RSASSA-PSS (PS256)
+
+```rust
+use cas_lib::asymmetric::{
+    cas_rsa::CASRSA,
+    types::{CASRSAEncryption, RSAKeyPairResult},
+};
+
+fn main() {
+    // Generate a 3072-bit RSA key pair (PEM-encoded strings).
+    let key_pair: RSAKeyPairResult = CASRSA::generate_rsa_keys(3072).unwrap();
+
+    // Read the document to sign.
+    let document: Vec<u8> = std::fs::read("contract.pdf").unwrap();
+
+    // Sign with the private key. The document is hashed with SHA-256 inside.
+    let signature = CASRSA::sign_pss(key_pair.private_key, document.clone()).unwrap();
+
+    // Verify with the public key -> true when the document is unmodified.
+    let is_valid = CASRSA::verify_pss(key_pair.public_key.clone(), document.clone(), signature.clone()).unwrap();
+    println!("signature valid: {}", is_valid); // true
+
+    // A modified document gives Ok(false), not an error.
+    let mut tampered = document;
+    tampered.push(0);
+    let is_valid = CASRSA::verify_pss(key_pair.public_key, tampered, signature).unwrap();
+    println!("tampered valid: {}", is_valid); // false
+}
+```
+
+### RSASSA-PKCS1-v1_5 (RS256)
 
 ```rust
 use cas_lib::asymmetric::{
@@ -813,7 +889,8 @@ fn main() {
     // Read the document to sign.
     let document: Vec<u8> = std::fs::read("contract.pdf").unwrap();
 
-    // Sign with the private key.
+    // Sign with the private key. The document is hashed with SHA-256 inside,
+    // and the signature is a standard RS256 signature.
     let signature = CASRSA::sign(key_pair.private_key, document.clone()).unwrap();
 
     // Verify with the public key -> true when the document is unmodified.
@@ -889,11 +966,20 @@ fn main() {
 
 The key_exchange module implements X25519 Diffie-Hellman. Each party generates a
 secret/public key pair; combining your secret key with the other party's public
-key yields a shared secret that is identical on both sides. That shared secret
-can then be turned into a symmetric key (see
-[`key_from_x25519_shared_secret`](#symmetric) on the AES types).
+key yields a shared secret that is identical on both sides.
+
+`diffie_hellman` returns `CasError::InvalidKey` if either key is not 32 bytes, or
+if the other party's public key is a low-order point. Such a key forces the
+all-zero shared secret whatever your secret key is, so an attacker who sends one
+would know the "shared" secret; the exchange fails instead.
+
+Don't use the shared secret as a key directly. Turn it into a symmetric key with
+[`key_from_x25519_shared_secret`](#importing-and-deriving-aes-keys) on the AES
+types, which binds the key to the cipher and to both public keys, or use
+[HPKE](#hybrid-hpke), which does the exchange, derivation and encryption together.
 
 ```rust
+use cas_lib::error::CasError;
 use cas_lib::key_exchange::{
     cas_key_exchange::CASKeyExchange,
     x25519::{X25519, X25519SecretPublicKeyResult},
@@ -910,6 +996,15 @@ fn main() {
 
     // Both sides derive the SAME shared secret -> true.
     println!("shared secrets match: {}", alice_shared == bob_shared); // true
+
+    // A low-order public key (here u = 0) is rejected rather than yielding the
+    // all-zero shared secret.
+    let me = X25519::generate_secret_and_public_key();
+    let low_order_key = vec![0u8; 32];
+    assert_eq!(
+        X25519::diffie_hellman(me.secret_key, low_order_key),
+        Err(CasError::InvalidKey)
+    );
 }
 ```
 

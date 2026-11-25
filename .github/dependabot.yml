@@ -1,0 +1,47 @@
+# Weekly dependency updates (#108). PR titles follow Conventional Commits so
+# they pass pr-title.yml: `chore(deps): ...` for crates (release-plz files them
+# under Other) and `ci(deps): ...` for actions.
+#
+# Security updates for vulnerable dependencies, including transitive ones, come
+# from Dependabot security updates (a repository setting), not from this file;
+# the weekly cargo audit workflow flags anything they miss.
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Wait a week after a release before proposing it, so a compromised or
+    # broken release has time to be yanked. Security updates skip this.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      # Patch releases are semver-compatible even for 0.x crates: one PR a week.
+      # Minor and major releases stay separate PRs, because for the 0.x crates
+      # this library mostly depends on (rsa, hpke, ml-kem, ...) a minor release
+      # is a breaking change that needs its own review.
+      cargo-patch:
+        update-types:
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      # All action bumps in one PR. Dependabot updates the SHA pin and keeps
+      # the `# vX.Y.Z` comment in step.
+      github-actions:
+        patterns:
+          - "*"
