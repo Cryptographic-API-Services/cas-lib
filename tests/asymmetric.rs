@@ -1,6 +1,11 @@
 #[cfg(test)]
 mod asymmetric {
     use cas_lib::asymmetric::{cas_rsa::CASRSA, types::{CASRSAEncryption, RSAKeyPairResult}};
+    use cas_lib::error::CasError;
+    use rand::rngs::OsRng;
+    use rsa::pkcs1::{EncodeRsaPublicKey, LineEnding};
+    use rsa::pkcs8::EncodePrivateKey;
+    use rsa::{Pkcs1v15Sign, RsaPrivateKey};
 
     #[test]
     pub fn generate_rsa_keys() {
@@ -30,6 +35,41 @@ mod asymmetric {
         let signature = CASRSA::sign(key_pair.private_key.clone(), document.clone()).unwrap();
         let verification = CASRSA::verify(key_pair.public_key, document, signature).unwrap();
         assert!(verification, "Signature should be valid");
+    }
+
+    /// Builds a 1024-bit key pair outside the library (whose key generation
+    /// refuses that size), as a key imported from elsewhere would be.
+    fn small_key_pair_pem() -> (RsaPrivateKey, String, String) {
+        let private_key = RsaPrivateKey::new(&mut OsRng, 1024).unwrap();
+        let private_pem = private_key.to_pkcs8_pem(LineEnding::LF).unwrap().to_string();
+        let public_pem = private_key.to_public_key().to_pkcs1_pem(LineEnding::LF).unwrap();
+        (private_key, private_pem, public_pem)
+    }
+
+    #[test]
+    pub fn sign_rejects_small_private_key() {
+        let (_, private_pem, _) = small_key_pair_pem();
+        let result = CASRSA::sign(private_pem, b"Hello, world!".to_vec());
+        assert_eq!(
+            result,
+            Err(CasError::InvalidParameters),
+            "signing with a private key below 2048 bits should be rejected"
+        );
+    }
+
+    #[test]
+    pub fn verify_rejects_small_public_key() {
+        let (private_key, _, public_pem) = small_key_pair_pem();
+        let document = b"Hello, world!".to_vec();
+        // A signature that is valid for the 1024-bit key, so the only reason to
+        // refuse it is the key size.
+        let signature = private_key.sign(Pkcs1v15Sign::new_unprefixed(), &document).unwrap();
+        let result = CASRSA::verify(public_pem, document, signature);
+        assert_eq!(
+            result,
+            Err(CasError::InvalidParameters),
+            "verifying with a public key below 2048 bits should be rejected"
+        );
     }
 }
 

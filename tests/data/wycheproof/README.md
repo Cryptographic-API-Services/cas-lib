@@ -33,9 +33,9 @@ Wycheproof is licensed under the Apache License 2.0; see
 | File | Exercised by |
 |---|---|
 | `aes_gcm_test.json` | `aes_gcm` in [`tests/wycheproof.rs`](../../wycheproof.rs) (AAD and non-AAD APIs) |
-| `aes_gcm_siv_test.json` | `aes_gcm_siv` in `tests/wycheproof.rs` |
-| `chacha20_poly1305_test.json` | `chacha20_poly1305` in `tests/wycheproof.rs` |
-| `ascon_sp800_232_aead128_test.json` | `ascon_aead128` in `tests/wycheproof.rs` |
+| `aes_gcm_siv_test.json` | `aes_gcm_siv` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
+| `chacha20_poly1305_test.json` | `chacha20_poly1305` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
+| `ascon_sp800_232_aead128_test.json` | `ascon_aead128` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
 | `hmac_sha256_test.json`, `hmac_sha512_test.json` | `hmac` in `tests/wycheproof.rs` |
 | `x25519_test.json` | `x25519` in `tests/wycheproof.rs` |
 | `ed25519_test.json` | `ed25519` in `tests/wycheproof.rs` |
@@ -66,8 +66,9 @@ Only what the public API cannot express is skipped.
 
 - **AES-GCM, AES-KW / AES-KWP: 192-bit keys** — the library exposes only 128-
   and 256-bit keys.
-- **AES-GCM-SIV, ChaCha20-Poly1305, Ascon-AEAD128: cases with AAD** — those
-  APIs take no AAD. AES-GCM has an AAD API, so its AAD cases run.
+- **Cases with AAD, in the tests of the non-AAD APIs** — `encrypt_plaintext`
+  / `decrypt_ciphertext` (and Ascon's `encrypt` / `decrypt`) take no AAD. Every
+  AEAD also has an `*_with_aad` API, and its test runs those cases.
 - **Nonce sizes the API does not accept** are not skipped: the test asserts
   that encryption and decryption reject them.
 - **HMAC truncated-tag groups** — the library returns the full tag, so these

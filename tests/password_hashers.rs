@@ -201,11 +201,11 @@ mod password_hashers {
     macro_rules! pbkdf2_vectors {
         ($($password:expr, $salt:expr, $rounds:expr, $expected_hex:expr;)*) => {
             $(
-                let derived = pbkdf2::derivation_with_salt($password.to_vec(), $rounds, $salt.to_vec());
+                let derived = pbkdf2::derivation_with_salt($password.to_vec(), $rounds, $salt.to_vec()).unwrap();
                 assert_eq!(
                     derived,
                     hex_to_bytes($expected_hex),
-                    "PBKDF2-SHA3 mismatch for password {:?}, salt {:?}, iterations {}",
+                    "PBKDF2-HMAC-SHA3-256 mismatch for password {:?}, salt {:?}, iterations {}",
                     $password,
                     $salt,
                     $rounds
@@ -214,30 +214,73 @@ mod password_hashers {
         };
     }
 
-    // Borrowed from RustCrypto's pbkdf2 crate tests, which in turn are based on the test vectors from RFC 6070.
-    // https://www.rfc-editor.org/rfc/rfc6070
+    // PBKDF2-HMAC-SHA3-256 known answers at the minimum iteration count and salt length, in the
+    // style of RFC 6070 (https://www.rfc-editor.org/rfc/rfc6070). The expected values were
+    // computed independently with OpenSSL through Python's
+    // `hashlib.pbkdf2_hmac("sha3_256", password, salt, iterations)`, so they also pin the PRF:
+    // keys derived before the minimums were introduced stay derivable.
     #[test]
-    pub fn pbkdf2_sha3_rfc6070_style_vectors() {
+    pub fn pbkdf2_sha3_known_answer_vectors() {
         pbkdf2_vectors!(
-            b"password", b"salt", 1, "94613f3ee2ea730e0b06754f3fc816d4f87c9be9cbd8556b5d59b52330e333a8";
-            b"password", b"salt", 2, "4c915baedd1773383e77fcfe38114ca7514010adec24b47290ec170208423f76";
-            b"password", b"salt", 4096, "778b6e237a0f49621549ff70d218d2080756b9fb38d71b5d7ef447fa2254af61";
-            b"passwordPASSWORDpassword", b"saltSALTsaltSALTsaltSALTsaltSALTsalt", 4096,
-                "7aef8f1ad8c7f12205334f624d4af9e2863121618f7a0b3209bef3934801c39f";
-            b"pass\0word", b"sa\0lt", 4096, "98e5503130ffdd69603da78cbb12e9becb948efa1445a639569cc1b042e643fd";
+            b"password", b"saltSALTsaltSALT", 600_000,
+                "09b0b25930ec6de36f4035300c0f0e30b82643df38291dc2ff6c67a32b42d568";
+            b"passwordPASSWORDpassword", b"saltSALTsaltSALTsaltSALTsaltSALTsalt", 600_000,
+                "0f2b39323f7523a6eef386c4458b0c5e055fb5f9349655cf704b31244751a95f";
+            b"pass\0word", b"sa\0ltsa\0ltsa\0lt\0", 600_001,
+                "3ff5f88bfbd68d52fcbe84b1d0f0fbc7e0e44bdb87621b384a50f0fe22eb39bc";
         );
+    }
+
+    #[test]
+    pub fn pbkdf2_minimums_are_exposed() {
+        assert_eq!(pbkdf2::MIN_ITERATIONS, 600_000);
+        assert_eq!(pbkdf2::MIN_SALT_LENGTH, 16);
+    }
+
+    #[test]
+    pub fn pbkdf2_accepts_exact_minimums() {
+        let salt = vec![0x5a; pbkdf2::MIN_SALT_LENGTH];
+        let key = pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, salt).unwrap();
+        assert_eq!(key.len(), 32);
+    }
+
+    #[test]
+    pub fn pbkdf2_rejects_iterations_below_minimum() {
+        let salt = vec![0x5a; pbkdf2::MIN_SALT_LENGTH];
+        for iterations in [0, 1, 4_096, pbkdf2::MIN_ITERATIONS - 1] {
+            assert_eq!(
+                pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), iterations, salt.clone()),
+                Err(CasError::InvalidParameters),
+                "derivation_with_salt accepted {iterations} iterations"
+            );
+            assert!(
+                matches!(pbkdf2::derivation(b"BadPassword".to_vec(), iterations), Err(CasError::InvalidParameters)),
+                "derivation accepted {iterations} iterations"
+            );
+        }
+    }
+
+    #[test]
+    pub fn pbkdf2_rejects_salt_below_minimum() {
+        for salt_length in [0, 1, 8, pbkdf2::MIN_SALT_LENGTH - 1] {
+            assert_eq!(
+                pbkdf2::derivation_with_salt(b"BadPassword".to_vec(), pbkdf2::MIN_ITERATIONS, vec![0x5a; salt_length]),
+                Err(CasError::InvalidParameters),
+                "derivation_with_salt accepted a {salt_length}-byte salt"
+            );
+        }
     }
 
     #[test]
     pub fn pbkdf2_derivation_round_trip_reuses_salt() {
         let password = b"BadPassword".to_vec();
-        let rounds = 8_192;
-        let result = pbkdf2::derivation(password.clone(), rounds);
+        let rounds = pbkdf2::MIN_ITERATIONS;
+        let result = pbkdf2::derivation(password.clone(), rounds).unwrap();
 
         assert_eq!(result.password.len(), 32);
-        assert!(!result.salt.is_empty());
+        assert!(result.salt.len() >= pbkdf2::MIN_SALT_LENGTH);
 
-        let recomputed = pbkdf2::derivation_with_salt(password, rounds, result.salt.clone());
+        let recomputed = pbkdf2::derivation_with_salt(password, rounds, result.salt.clone()).unwrap();
         assert_eq!(recomputed, result.password);
     }
 }

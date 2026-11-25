@@ -1,6 +1,6 @@
 
 
-use super::cas_hasher::CASHasher;
+use super::cas_hasher::{digests_match, CASHasher};
 use sha2::{Digest, Sha256, Sha512};
 pub struct CASSHA2;
 
@@ -20,7 +20,7 @@ impl CASHasher for CASSHA2 {
         let mut hasher = Sha512::new();
         hasher.update(data_to_verify);
         let result = hasher.finalize();
-        return hash_to_verify.eq(&result.to_vec());
+        return digests_match(&hash_to_verify, &result);
     }
 
     /// Hashes data using the SHA2-256 algorithm.
@@ -38,6 +38,6 @@ impl CASHasher for CASSHA2 {
         let mut hasher = Sha256::new();
         hasher.update(data_to_verify);
         let result = hasher.finalize();
-        return hash_to_verify.eq(&result.to_vec());
+        return digests_match(&hash_to_verify, &result);
     }
 }
