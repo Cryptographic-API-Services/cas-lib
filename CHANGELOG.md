@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.7.0...v0.7.1) - 2026-11-26
+
+### Added
+
+- add HKDF-SHA256 and HKDF-SHA512 (extract, expand, derive) ([#152](https://github.com/Cryptographic-API-Services/cas-lib/pull/152))
+
 ## [0.7.0](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.6.0...v0.7.0) - 2026-11-25
 
 Upgrades every AEAD dependency to `aead` 0.6 (#85), so the crate builds one `aead`/`aes` stack. The public API is unchanged, and so are the key, nonce and ciphertext formats: keys and data from 0.6.0 keep working.
