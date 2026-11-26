@@ -31,6 +31,7 @@ cargo run
 - [Signatures (Ed25519)](#signatures-ed25519)
 - [Key Exchange (X25519)](#key-exchange-x25519)
 - [Message Authentication (HMAC)](#message-authentication-hmac)
+- [Key Derivation (HKDF)](#key-derivation-hkdf)
 - [Hybrid (HPKE)](#hybrid-hpke)
 - [Sponges (ASCON-AEAD)](#sponges-ascon-aead)
 - [Compression (Zstandard)](#compression-zstandard)
@@ -1051,6 +1052,58 @@ fn main() {
 ```
 
 
+## Key Derivation (HKDF)
+
+The kdf module implements HKDF (RFC 5869) with HMAC-SHA-256 (`CASHkdfSha256`)
+and HMAC-SHA-512 (`CASHkdfSha512`); both implement the `CASHKDF` trait. Use it
+to turn a shared secret (from X25519, ML-KEM, or several of them concatenated)
+into keys. It is not a password hash: for passwords use
+[Argon2](#argon2).
+
+- `extract(salt, ikm)` returns a pseudorandom key (PRK) of `HASH_LEN` bytes
+  (32 or 64). An empty `salt` means "no salt", i.e. `HASH_LEN` zero bytes.
+- `expand(prk, info, length)` derives `length` bytes for the purpose named by
+  `info`. Expanding one PRK with distinct `info` values gives unrelated keys.
+  It returns `CasError::InvalidKey` if `prk` is shorter than `HASH_LEN`.
+- `derive(salt, ikm, info, length)` is `extract` followed by one `expand`.
+
+`expand` and `derive` return `CasError::InvalidParameters` if `length` is 0 or
+more than `MAX_OUTPUT_LEN` (`255 * HASH_LEN`: 8160 bytes for SHA-256, 16320 for
+SHA-512). The PRK and the derived keys are secrets you own: zeroize them when
+done (see [Handling Secret Key Material](#handling-secret-key-material)).
+
+```rust
+use cas_lib::kdf::cas_hkdf::{CASHkdfSha256, CASHkdfSha512, CASHKDF};
+use cas_lib::key_exchange::{cas_key_exchange::CASKeyExchange, x25519::X25519};
+
+fn main() {
+    // Both parties end up with the same X25519 shared secret.
+    let alice = X25519::generate_secret_and_public_key();
+    let bob = X25519::generate_secret_and_public_key();
+    let shared = X25519::diffie_hellman(alice.secret_key, bob.public_key.clone()).unwrap();
+
+    // Extract once (the salt is public, e.g. a session id), then expand one key
+    // per purpose. Each side gets the same two keys.
+    let session_id = b"session-1234".to_vec();
+    let prk = CASHkdfSha512::extract(session_id.clone(), shared.clone());
+    let send_key = CASHkdfSha512::expand(prk.clone(), b"my-app/v1 send".to_vec(), 32).unwrap();
+    let receive_key = CASHkdfSha512::expand(prk, b"my-app/v1 receive".to_vec(), 32).unwrap();
+    assert_ne!(send_key, receive_key);
+
+    // Extract and expand in one call gives the same key.
+    let same = CASHkdfSha512::derive(session_id, shared.clone(), b"my-app/v1 send".to_vec(), 32).unwrap();
+    assert_eq!(same, send_key);
+
+    // HKDF-SHA256, no salt, 16-byte output.
+    let key = CASHkdfSha256::derive(Vec::new(), shared, b"my-app/v1 aes-128".to_vec(), 16).unwrap();
+    println!("hkdf-sha256 key: {} bytes", key.len()); // 16
+
+    // Lengths outside 1..=MAX_OUTPUT_LEN are rejected.
+    assert_eq!(CASHkdfSha256::MAX_OUTPUT_LEN, 8160);
+    assert!(CASHkdfSha256::derive(Vec::new(), vec![1], Vec::new(), 8161).is_err());
+}
+```
+
 ## Hybrid (HPKE)
 
 The hybrid module implements HPKE (Hybrid Public Key Encryption). The recipient
@@ -1405,7 +1458,7 @@ fn main() {
 ## Handling Secret Key Material
 
 `cas-lib` zeroizes the intermediate secret buffers it allocates itself (for
-example the HKDF and Argon2 derived keys and its copies of X25519 and Ed25519
+example the HKDF output and Argon2 derived keys and its copies of X25519 and Ed25519
 secret keys). Secrets it **returns** are plain `Vec<u8>` values that you own:
 generated and derived keys, private keys and shared secrets. Zeroize them once
 you no longer need them. FFI binding layers must zero these buffers before

@@ -4,9 +4,10 @@
 //! # Secret key material
 //!
 //! The crate zeroizes the intermediate secret buffers it allocates itself: the
-//! HKDF-derived AES keys, the Argon2-derived AES keys, and the fixed-size copies
-//! of X25519 and Ed25519 secret keys. Those same functions also zeroize the
-//! secret `Vec<u8>` argument they take by value. Other functions do not yet
+//! HKDF-derived AES keys, the [`kdf`] output buffers, the Argon2-derived AES
+//! keys, and the fixed-size copies of X25519 and Ed25519 secret keys. Those same
+//! functions (and the [`kdf`] functions, for their `ikm` and `prk` arguments)
+//! also zeroize the secret `Vec<u8>` argument they take by value. Other functions do not yet
 //! zeroize their secret arguments.
 //!
 //! Secrets this crate **returns** (generated or derived keys, private keys,
@@ -32,6 +33,11 @@ pub mod hashers {
     pub mod cas_hasher;
     pub mod sha;
     pub mod sha2;
+}
+
+pub mod kdf {
+    pub mod cas_hkdf;
+    pub mod hkdf;
 }
 
 pub mod key_exchange {
