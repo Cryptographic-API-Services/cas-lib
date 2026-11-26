@@ -53,6 +53,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 | `hybrid` | HPKE |
 | `sponges` | ASCON-AEAD |
 | `message` | HMAC |
+| `kdf` | HKDF-SHA256, HKDF-SHA512 (extract, expand, derive) |
 | `pqc` | ML-KEM, SLH-DSA, ML-DSA |
 | `compression` | Zstandard |
 

@@ -410,6 +410,62 @@ mod hmac {
 }
 
 // ---------------------------------------------------------------------------
+// HKDF
+// ---------------------------------------------------------------------------
+
+mod hkdf {
+    use super::*;
+    use cas_lib::error::CasError;
+    use cas_lib::kdf::cas_hkdf::{CASHkdfSha256, CASHkdfSha512, CASHKDF};
+
+    /// - `valid`: `derive`, and `extract` followed by `expand`, must both
+    ///   reproduce `okm`.
+    /// - `invalid` (every one is an output size above `255 * HashLen`): both must
+    ///   return `CasError::InvalidParameters`.
+    fn run_hkdf<H: CASHKDF>(file_name: &str) {
+        let file = load(file_name);
+        let mut tally = Tally::new(file_name, &file);
+
+        for group in groups(&file) {
+            for test in tests(group) {
+                tally.run += 1;
+                let ikm = hex_field(test, "ikm");
+                let salt = hex_field(test, "salt");
+                let info = hex_field(test, "info");
+                let size = int_field(test, "size");
+                let expected = match str_field(test, "result") {
+                    "valid" => Ok(hex_field(test, "okm")),
+                    _ => Err(CasError::InvalidParameters),
+                };
+
+                let derived = H::derive(salt.clone(), ikm.clone(), info.clone(), size);
+                tally.check(derived == expected, test, "derive disagreed with the expected result");
+
+                let prk = H::extract(salt, ikm);
+                let expanded = H::expand(prk, info, size);
+                tally.check(
+                    expanded == expected,
+                    test,
+                    "extract + expand disagreed with the expected result",
+                );
+            }
+        }
+
+        tally.finish();
+    }
+
+    #[test]
+    fn hkdf_sha256_vectors() {
+        run_hkdf::<CASHkdfSha256>("hkdf_sha256_test.json");
+    }
+
+    #[test]
+    fn hkdf_sha512_vectors() {
+        run_hkdf::<CASHkdfSha512>("hkdf_sha512_test.json");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // X25519 / Ed25519
 // ---------------------------------------------------------------------------
 

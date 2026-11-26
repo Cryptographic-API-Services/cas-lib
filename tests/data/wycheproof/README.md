@@ -37,6 +37,7 @@ Wycheproof is licensed under the Apache License 2.0; see
 | `chacha20_poly1305_test.json` | `chacha20_poly1305` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
 | `ascon_sp800_232_aead128_test.json` | `ascon_aead128` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
 | `hmac_sha256_test.json`, `hmac_sha512_test.json` | `hmac` in `tests/wycheproof.rs` |
+| `hkdf_sha256_test.json`, `hkdf_sha512_test.json` | `hkdf` in `tests/wycheproof.rs` (`derive`, and `extract` + `expand`) |
 | `x25519_test.json` | `x25519` in `tests/wycheproof.rs` |
 | `ed25519_test.json` | `ed25519` in `tests/wycheproof.rs` |
 | `mlkem_1024_semi_expanded_decaps_test.json` | `ml_kem_1024` in `tests/wycheproof.rs` |
@@ -118,8 +119,8 @@ to, so deterministic signing must reproduce the expected `sig` byte for byte.
   no RSA encryption.
 - **PBKDF2** — the library uses HMAC-SHA3-256; Wycheproof has PBKDF2 vectors
   for HMAC-SHA1/224/256/384/512 only.
-- **HKDF** — used internally (the `key_from_x25519_shared_secret` helpers, with
-  a cas-lib-specific `info`); not exposed.
+- **HKDF-SHA1 / SHA-384** — the `kdf` module exposes only HKDF-SHA256 and
+  HKDF-SHA512.
 - **SHA-2 / SHA-3 / BLAKE2, SLH-DSA, Argon2, bcrypt, scrypt, Zstandard** —
   Wycheproof has no vectors for them. SHA-2 and SHA-3 are covered by the NIST
   files in `tests/data/hashers/`.
