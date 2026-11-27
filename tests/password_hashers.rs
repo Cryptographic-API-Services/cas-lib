@@ -14,16 +14,23 @@ mod password_hashers {
             cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption},
         },
     };
-    use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
-
-    /// A fresh password for tests whose outcome does not depend on its value.
+    /// A fresh 20-character alphanumeric password for tests whose outcome does not
+    /// depend on its value. Each byte from the OS random number generator is mapped
+    /// onto the 62-character alphabet; the slight modulo bias is fine for test data.
     fn random_password() -> String {
-        OsRng.sample_iter(&Alphanumeric).take(20).map(char::from).collect()
+        const ALPHANUMERIC: &[u8] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        random_salt(20)
+            .into_iter()
+            .map(|b| char::from(ALPHANUMERIC[usize::from(b) % ALPHANUMERIC.len()]))
+            .collect()
     }
 
     /// A fresh salt of `len` bytes for tests whose outcome does not depend on its value.
     fn random_salt(len: usize) -> Vec<u8> {
-        (0..len).map(|_| OsRng.gen()).collect()
+        let mut bytes = vec![0u8; len];
+        getrandom::fill(&mut bytes).expect("getrandom failure");
+        bytes
     }
 
     #[test]

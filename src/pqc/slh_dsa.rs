@@ -52,8 +52,8 @@ fn key_pair_from_seeds(seeds: &[u8; SEEDS_LEN]) -> SlhDsaKeyPair {
 ///
 /// # Panics
 ///
-/// Panics if the operating system's random number generator fails, like
-/// x25519-dalek's `StaticSecret::random` (and `rand`'s `OsRng`).
+/// Panics if the operating system's random number generator (`getrandom`)
+/// fails, like x25519-dalek's `StaticSecret::random`.
 pub fn generate_signing_and_verification_key() -> SlhDsaKeyPair {
     // FIPS 205 slh_keygen (Algorithm 21): draw SK.seed, SK.prf and PK.seed, n
     // bytes each, and run slh_keygen_internal. slh-dsa's `SigningKey::new`
