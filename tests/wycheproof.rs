@@ -410,6 +410,89 @@ mod hmac {
 }
 
 // ---------------------------------------------------------------------------
+// CMAC
+// ---------------------------------------------------------------------------
+
+mod cmac {
+    use super::*;
+    use cas_lib::error::CasError;
+    use cas_lib::message::cmac::CASCMAC;
+    use cas_lib::message::cas_cmac::{CMACAES128, CMACAES256};
+
+    /// Groups are dispatched on `keySize`:
+    /// - 128 and 256 bits run against `CMACAES128` / `CMACAES256`. The library
+    ///   always produces and verifies the full 16-byte tag, so groups with a
+    ///   truncated `tagSize` are checked against the leading bytes of the
+    ///   computed tag and `verify` runs only for full-length tags.
+    /// - 192 bits is skipped: the library has no AES-192 CMAC.
+    /// - Any other size is an invalid AES key, which both implementations must
+    ///   reject with `CasError::InvalidKey`.
+    fn check_case<M: CASCMAC>(tally: &mut Tally, test: &Value, tag_bytes: usize) {
+        let key = hex_field(test, "key");
+        let msg = hex_field(test, "msg");
+        let tag = hex_field(test, "tag");
+        let valid = str_field(test, "result") == "valid";
+
+        let Ok(computed) = M::sign(key.clone(), msg.clone()) else {
+            tally.check(false, test, "sign returned an error");
+            return;
+        };
+        tally.check(
+            (computed[..tag_bytes] == tag[..]) == valid,
+            test,
+            if valid { "tag mismatch" } else { "invalid tag matched the computed tag" },
+        );
+        if tag_bytes == 16 {
+            tally.check(
+                M::verify(key, msg, tag) == Ok(valid),
+                test,
+                "verify disagreed with the expected result",
+            );
+        }
+    }
+
+    #[test]
+    fn aes_cmac_vectors() {
+        let file_name = "aes_cmac_test.json";
+        let file = load(file_name);
+        let mut tally = Tally::new(file_name, &file);
+
+        for group in groups(&file) {
+            let key_size = int_field(group, "keySize");
+            let tag_bytes = int_field(group, "tagSize") / 8;
+
+            for test in tests(group) {
+                match key_size {
+                    128 => {
+                        tally.run += 1;
+                        check_case::<CMACAES128>(&mut tally, test, tag_bytes);
+                    }
+                    256 => {
+                        tally.run += 1;
+                        check_case::<CMACAES256>(&mut tally, test, tag_bytes);
+                    }
+                    192 => tally.skipped += 1,
+                    _ => {
+                        tally.run += 1;
+                        assert_eq!(str_field(test, "result"), "invalid", "{}", label(test));
+                        let key = hex_field(test, "key");
+                        let msg = hex_field(test, "msg");
+                        let tag = hex_field(test, "tag");
+                        let rejected = CMACAES128::sign(key.clone(), msg.clone()) == Err(CasError::InvalidKey)
+                            && CMACAES256::sign(key.clone(), msg.clone()) == Err(CasError::InvalidKey)
+                            && CMACAES128::verify(key.clone(), msg.clone(), tag.clone()) == Err(CasError::InvalidKey)
+                            && CMACAES256::verify(key, msg, tag) == Err(CasError::InvalidKey);
+                        tally.check(rejected, test, "invalid key size was not rejected with InvalidKey");
+                    }
+                }
+            }
+        }
+
+        tally.finish();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // HKDF
 // ---------------------------------------------------------------------------
 

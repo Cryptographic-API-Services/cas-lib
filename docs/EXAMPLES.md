@@ -31,6 +31,7 @@ cargo run
 - [Signatures (Ed25519)](#signatures-ed25519)
 - [Key Exchange (X25519)](#key-exchange-x25519)
 - [Message Authentication (HMAC)](#message-authentication-hmac)
+- [Message Authentication (CMAC)](#message-authentication-cmac)
 - [Key Derivation (HKDF)](#key-derivation-hkdf)
 - [Hybrid (HPKE)](#hybrid-hpke)
 - [Sponges (ASCON-AEAD)](#sponges-ascon-aead)
@@ -1051,6 +1052,41 @@ fn main() {
 }
 ```
 
+
+## Message Authentication (CMAC)
+
+CMAC (NIST SP 800-38B; RFC 4493 for AES-128) is a MAC built on the AES block
+cipher instead of a hash. `CMACAES128` takes a 16-byte key and `CMACAES256` a
+32-byte key; both produce a 16-byte tag and implement the `CASCMAC` trait.
+`sign` returns `CasError::InvalidKey` for a key of the wrong length, and
+`verify` compares the full tag in constant time (a truncated or tampered tag
+verifies as `false`). Any uniformly random key of the right length works, for
+example one from the AES key generators.
+
+```rust
+use cas_lib::message::{cmac::CASCMAC, cas_cmac::{CMACAES128, CMACAES256}};
+use cas_lib::symmetric::aes::{CASAES128, CASAES256};
+use cas_lib::symmetric::cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption};
+
+fn main() {
+    let message: Vec<u8> = b"message to authenticate".to_vec();
+
+    // AES-128-CMAC with a random 16-byte key.
+    let key = <CASAES128 as CASAES128Encryption>::generate_key();
+    let tag = CMACAES128::sign(key.clone(), message.clone()).unwrap();
+    assert_eq!(tag.len(), 16);
+    let is_valid = CMACAES128::verify(key, message.clone(), tag).unwrap();
+    println!("aes-128-cmac valid: {}", is_valid); // true
+
+    // AES-256-CMAC with a random 32-byte key.
+    let key = <CASAES256 as CASAES256Encryption>::generate_key();
+    let tag = CMACAES256::sign(key.clone(), message.clone()).unwrap();
+
+    // A modified message does not verify.
+    let is_valid = CMACAES256::verify(key, b"tampered".to_vec(), tag).unwrap();
+    println!("aes-256-cmac valid: {}", is_valid); // false
+}
+```
 
 ## Key Derivation (HKDF)
 
