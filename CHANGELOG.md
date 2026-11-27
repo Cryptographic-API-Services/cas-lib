@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.7.1...v0.7.2) - 2026-11-27
+
+### Documentation
+
+- drop the stale rand OsRng mention from the SLH-DSA keygen docs
+
+### Other
+
+- *(deps)* remove the rand dependency
+- generate SLH-DSA keys from getrandom seeds via slh_keygen_internal
+- generate AEAD keys and nonces with getrandom instead of rand
+- generate the Argon2 KDF salt with getrandom instead of rand
+- Merge pull request #176: chore(deps): upgrade argon2 to 0.6 and scrypt to 0.12
+- Merge pull request #174: chore(deps): upgrade zstd to 0.14
+- Merge deps/rustcrypto-upgrades ([#175](https://github.com/Cryptographic-API-Services/cas-lib/pull/175)) into deps/168-password-hash-0.6
+- *(deps)* upgrade argon2 to 0.6 and scrypt to 0.12
+- *(deps)* upgrade ed25519-dalek to 3.0 and curve25519-dalek to 5
+- *(deps)* upgrade zstd to 0.14
+- *(deps)* upgrade sha2, sha3, blake2, hmac and pbkdf2 to digest 0.11
+
 ## [0.7.1](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.7.0...v0.7.1) - 2026-11-26
 
 ### Added
