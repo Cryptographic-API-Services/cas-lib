@@ -1,6 +1,10 @@
 #[cfg(test)]
 mod message {
-    use cas_lib::message::{cas_hmac::CASHMAC, hmac::{HMACSha256, HMACSha512}};
+    use cas_lib::message::{
+        cas_hmac::CASHMAC,
+        hmac::{HMACSha256, HMACSha384, HMACSha3_256, HMACSha3_384, HMACSha3_512, HMACSha512},
+    };
+    use serde_json::Value;
     use std::fs;
 
     #[test]
@@ -92,41 +96,100 @@ mod message {
         cases
     }
 
-    /// Validates every SHA-256 HMACVS vector by signing and comparing against
-    /// the (possibly truncated) expected tag, plus a full-length `verify`.
-    #[test]
-    fn test_hmac_sha256_nist_vectors() {
-        let cases = parse_hmac_vectors("tests/data/hmac/HMAC.txt", "[L=32]");
-        assert!(!cases.is_empty(), "no [L=32] vectors were parsed");
+    const CAVP_VECTORS: &str = "tests/data/hmac/HMAC.txt";
 
+    /// Runs every record of one block of the NIST CAVP HMACVS file. `sign` must
+    /// reproduce `Mac`, which is the full tag truncated to `Tlen` bytes, and
+    /// `verify` must accept every full-length `Mac` and reject it once a byte is
+    /// flipped. `expected` is the block's record count, so a parsing slip cannot
+    /// quietly drop cases.
+    fn check_cavp_vectors<H: CASHMAC>(section: &str, tag_len: usize, expected: usize) {
+        let cases = parse_hmac_vectors(CAVP_VECTORS, section);
+        assert_eq!(cases.len(), expected, "{section}: unexpected number of records");
+
+        let mut full_length = 0;
         for case in &cases {
-            let tag = HMACSha256::sign(case.key.clone(), case.msg.clone()).unwrap();
-            assert_eq!(tag.len(), 32, "SHA-256 HMAC must produce a 32-byte tag");
+            let tag = H::sign(case.key.clone(), case.msg.clone()).unwrap();
+            assert_eq!(tag.len(), tag_len, "{section}: wrong tag length");
+            assert_eq!(&tag[..case.tlen], &case.mac[..], "{section}: tag mismatch");
 
-            // `Mac` is the full tag truncated to `Tlen` bytes.
-            assert_eq!(&tag[..case.tlen], &case.mac[..]);
+            // `verify` takes only a full-length tag.
+            if case.tlen == tag_len {
+                full_length += 1;
+                assert!(H::verify(case.key.clone(), case.msg.clone(), case.mac.clone()).unwrap());
 
-            // `verify` requires a full-length tag, so it only applies when the
-            // vector is not truncated.
-            if case.tlen == 32 {
-                assert!(HMACSha256::verify(case.key.clone(), case.msg.clone(), case.mac.clone()).unwrap());
+                let mut tampered = case.mac.clone();
+                tampered[0] ^= 0x01;
+                assert!(!H::verify(case.key.clone(), case.msg.clone(), tampered).unwrap());
             }
         }
+        assert_eq!(full_length, 75, "{section}: unexpected number of full-length records");
     }
 
-    /// A tampered tag must not verify.
     #[test]
-    fn test_hmac_sha256_nist_vectors_negative() {
-        let cases = parse_hmac_vectors("tests/data/hmac/HMAC.txt", "[L=32]");
-        let case = cases
-            .iter()
-            .find(|c| c.tlen == 32)
-            .expect("expected at least one full-length (Tlen=32) vector");
+    fn test_hmac_sha256_nist_vectors() {
+        check_cavp_vectors::<HMACSha256>("[L=32]", 32, 225);
+    }
 
-        let mut tampered = case.mac.clone();
-        tampered[0] ^= 0x01;
+    #[test]
+    fn test_hmac_sha384_nist_vectors() {
+        check_cavp_vectors::<HMACSha384>("[L=48]", 48, 300);
+    }
 
-        assert!(!HMACSha256::verify(case.key.clone(), case.msg.clone(), tampered).unwrap());
+    #[test]
+    fn test_hmac_sha512_nist_vectors() {
+        check_cavp_vectors::<HMACSha512>("[L=64]", 64, 375);
+    }
+
+    /// Runs every case of a NIST ACVP HMAC `internalProjection.json` file. Every
+    /// `mac` in these files is truncated, so `sign` must reproduce it as the
+    /// leading bytes of the full tag; `verify` is covered by Wycheproof.
+    fn check_acvp_vectors<H: CASHMAC>(file: &str, algorithm: &str, tag_len: usize) {
+        let path = format!("tests/data/hmac/acvp/{file}");
+        let json: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(json["algorithm"], algorithm, "{path}: wrong algorithm");
+
+        let bits = |case: &Value, field: &str| -> usize {
+            let bits = case[field].as_u64().unwrap() as usize;
+            assert_eq!(bits % 8, 0, "{path}: {field} is not a whole number of bytes");
+            bits / 8
+        };
+
+        let mut run = 0;
+        for group in json["testGroups"].as_array().unwrap() {
+            assert_eq!(group["testType"], "AFT", "{path}: unexpected test type");
+            for case in group["tests"].as_array().unwrap() {
+                let id = &case["tcId"];
+                let key = decode_hex(case["key"].as_str().unwrap());
+                let msg = decode_hex(case["msg"].as_str().unwrap());
+                let mac = decode_hex(case["mac"].as_str().unwrap());
+                assert_eq!(key.len(), bits(case, "keyLen"), "{path} tcId {id}: keyLen");
+                assert_eq!(msg.len(), bits(case, "msgLen"), "{path} tcId {id}: msgLen");
+                assert_eq!(mac.len(), bits(case, "macLen"), "{path} tcId {id}: macLen");
+                assert!(mac.len() <= tag_len, "{path} tcId {id}: mac longer than the tag");
+
+                let tag = H::sign(key, msg).unwrap();
+                assert_eq!(tag.len(), tag_len, "{path} tcId {id}: wrong tag length");
+                assert_eq!(&tag[..mac.len()], &mac[..], "{path} tcId {id}: tag mismatch");
+                run += 1;
+            }
+        }
+        assert_eq!(run, 150, "{path}: unexpected number of cases");
+    }
+
+    #[test]
+    fn test_hmac_sha3_256_nist_acvp_vectors() {
+        check_acvp_vectors::<HMACSha3_256>("HMAC-SHA3-256.json", "HMAC-SHA3-256", 32);
+    }
+
+    #[test]
+    fn test_hmac_sha3_384_nist_acvp_vectors() {
+        check_acvp_vectors::<HMACSha3_384>("HMAC-SHA3-384.json", "HMAC-SHA3-384", 48);
+    }
+
+    #[test]
+    fn test_hmac_sha3_512_nist_acvp_vectors() {
+        check_acvp_vectors::<HMACSha3_512>("HMAC-SHA3-512.json", "HMAC-SHA3-512", 64);
     }
 
     #[test]
@@ -202,8 +265,6 @@ mod message {
 
     #[test]
     fn hmac_round_trip_all_variants() {
-        use cas_lib::message::hmac::{HMACSha384, HMACSha3_256, HMACSha3_384, HMACSha3_512};
-
         check_round_trip::<HMACSha256>(32);
         check_round_trip::<HMACSha384>(48);
         check_round_trip::<HMACSha512>(64);
@@ -216,8 +277,6 @@ mod message {
     /// (guards against a variant being wired to the wrong hash).
     #[test]
     fn hmac_variants_are_distinct() {
-        use cas_lib::message::hmac::{HMACSha384, HMACSha3_256, HMACSha3_384, HMACSha3_512};
-
         let key = vec![0x0b; 32];
         let message = b"cas-lib hmac".to_vec();
         let tags = [
