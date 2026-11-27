@@ -17,32 +17,31 @@ crate-type = ["lib"]
 [dependencies]
 aes-gcm = "0.11.1"
 aes-gcm-siv = "0.12.1"
-argon2 = "0.5.2"
+argon2 = "0.6.0"
 bcrypt = "0.19.3"
-blake2 = "0.10.6"
+blake2 = "0.11.0"
 rand = "0.8.6"
 rsa = { version = "0.10", features = ["pkcs1v15"] }
-getrandom = { version = "0.4", features = ["sys_rng"] } # rand_core 0.10 OS RNG for RSA key generation
-scrypt = "0.11.0"
-sha3 = "0.10.8"
+getrandom = { version = "0.4", features = ["sys_rng"] } # OS RNG: rand_core 0.10 SysRng for RSA keys, getrandom::fill for Ed25519 keys and PBKDF2 salts
+scrypt = { version = "0.12.0", default-features = false, features = ["phc", "getrandom"] } # 0.12 has no default features
+sha3 = "0.12.0"
 x25519-dalek = { version = "3.0.0", features = ["static_secrets", "getrandom"] }
 ascon-aead = "0.6.1"
-hmac = "0.12.1"
-sha2 = "0.10.8"
+hmac = "0.13.0"
+sha2 = "0.11.2"
 subtle = "2.6.1"
-# 0.13.6 floor: requires zstd-safe 7.4.2 / zstd-sys 2.2.0, so downstream lockfiles
-# can't resolve the stack hit by RUSTSEC-2026-0391/0398/0403/0410 (#108).
-zstd = { version = "0.13.6", default-features = false } # no `legacy`: pre-v0.8 frame decoders (#107)
+# 0.14.5 floor (#170): requires zstd-safe 8.4.0 / zstd-sys 2.2.0, above the patched
+# versions for RUSTSEC-2026-0391 (zstd >=0.14.3), 0398/0403 (zstd-safe >=8.2.0) and
+# 0410 (zstd-sys >=2.1.2) (#108), so downstream lockfiles can't resolve the
+# vulnerable stack. 0.14 keeps the same default features, so `legacy` stays off.
+zstd = { version = "0.14.5", default-features = false } # no `legacy`: pre-v0.8 frame decoders (#107)
 # No `p256`: only X25519HkdfSha256 is used, and p256 pulls in crypto-bigint 0.5
 # (RUSTSEC-2026-0387, #108).
 hpke = { version = "0.15.1", default-features = false, features = ["alloc", "x25519", "aes", "getrandom"] }
 uuid = { version = "1.10.0", features = ["v4"] }
-pbkdf2 = "0.12.2"
-ed25519-dalek = { version = "2", features = ["rand_core"] }
+pbkdf2 = "0.13.0"
+ed25519-dalek = "3.0.0"
 hkdf = "0.13.0"
-# hkdf 0.13 is built on digest 0.11, so it needs sha2 0.11; the rest of the crate is
-# still on sha2 0.10. Drop this alias once `sha2` itself moves to 0.11.
-sha2-hkdf = { package = "sha2", version = "0.11" }
 chacha20poly1305 = "0.11.0"
 slh-dsa = "0.0.3"  
 ml-kem = { version = "0.3.4", features = ["getrandom", "zeroize"] }
@@ -52,7 +51,7 @@ zeroize = "1.8"
 
 [dev-dependencies]
 serde_json = "1"
-curve25519-dalek = "4"
+curve25519-dalek = "5.0.0"
 
 # RSA key generation (crypto-bigint / crypto-primes, used by `rsa`) is very
 # slow unoptimized; keep it fast in dev and test builds.

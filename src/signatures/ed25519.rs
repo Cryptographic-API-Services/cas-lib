@@ -1,11 +1,5 @@
-extern crate ed25519_dalek;
-extern crate rand;
-
-
-
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use ed25519_dalek::Signature;
-use rand::rngs::OsRng;
 use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
@@ -30,9 +24,18 @@ fn secret_key_bytes(key_pair: Vec<u8>) -> CasResult<Zeroizing<[u8; 32]>> {
 ///
 /// `key_pair` is the secret key, owned by the caller, who must zeroize it when done
 /// (FFI layers: before freeing it). See the crate-level docs.
+///
+/// # Panics
+///
+/// Panics if the operating system's random number generator fails, like
+/// x25519-dalek's `StaticSecret::random` (and `rand`'s `OsRng`).
 pub fn get_ed25519_key_pair() -> Ed25519ByteKeyPair {
-    let mut csprng = OsRng;
-    let keypair = SigningKey::generate(&mut csprng);
+    // The secret key is 32 bytes from the OS RNG, exactly what
+    // `SigningKey::generate` does, but drawn into a buffer that is zeroized on
+    // drop (`generate` leaves its copy on the stack).
+    let mut secret_key = Zeroizing::new([0u8; 32]);
+    getrandom::fill(&mut *secret_key).expect("getrandom failure");
+    let keypair = SigningKey::from_bytes(&secret_key);
     let keypair_vec = keypair.as_bytes().to_vec();
     let public_key = keypair.verifying_key().as_bytes().to_vec();
     return Ed25519ByteKeyPair {

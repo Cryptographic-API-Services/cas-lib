@@ -4,11 +4,14 @@
 
 
 use scrypt::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{phc::PasswordHash, PasswordHasher, PasswordVerifier},
     Scrypt, Params
 };
 
 use crate::error::{CasError, CasResult};
+
+/// Length, in bytes, of the hash output written into the PHC string.
+const OUTPUT_LENGTH: usize = 32;
 
 /// The smallest `cpu_memory_cost` (log₂ N) accepted when hashing.
 pub const MIN_LOG_N: u8 = 10;
@@ -40,11 +43,11 @@ impl CASScrypt {
         {
             return Err(CasError::InvalidParameters);
         }
-        let salt = SaltString::generate(&mut OsRng);
-        let params = Params::new(cpu_memory_cost, block_size, parallelism, 32)
+        let params = Params::new_with_output_len(cpu_memory_cost, block_size, parallelism, OUTPUT_LENGTH)
             .map_err(|_| CasError::InvalidParameters)?;
-        Ok(Scrypt
-            .hash_password_customized(password_to_hash.as_bytes(), None, None, params, &salt)
+        // Draws a 16-byte salt from the OS RNG; an RNG failure is an error, not a panic.
+        Ok(Scrypt::new_with_params(params)
+            .hash_password(password_to_hash.as_bytes())
             .map_err(|_| CasError::PasswordHashingFailed)?
             .to_string())
     }
@@ -52,9 +55,12 @@ impl CASScrypt {
     /// Hashes a password using Scrypt.
     /// Returns the hashed password as a string.
     pub fn hash_password(password_to_hash: String) -> CasResult<String> {
-        let salt = SaltString::generate(&mut OsRng);
-        Ok(Scrypt
-            .hash_password(password_to_hash.as_bytes(), &salt)
+        // log₂ N = 17, r = 8, p = 1 (the OWASP recommendation, scrypt's default before
+        // 0.12 too), pinned here so a later `scrypt` release can't change it.
+        let params = Params::new_with_output_len(17, 8, 1, OUTPUT_LENGTH)
+            .map_err(|_| CasError::InvalidParameters)?;
+        Ok(Scrypt::new_with_params(params)
+            .hash_password(password_to_hash.as_bytes())
             .map_err(|_| CasError::PasswordHashingFailed)?
             .to_string())
     }
@@ -76,7 +82,7 @@ impl CASScrypt {
         if params.log_n() > MAX_LOG_N || params.r() > MAX_BLOCK_SIZE || params.p() > MAX_PARALLELISM {
             return Err(CasError::InvalidParameters);
         }
-        Ok(Scrypt
+        Ok(Scrypt::new()
             .verify_password(password_to_verify.as_bytes(), &parsed_hash)
             .is_ok())
     }

@@ -1,8 +1,5 @@
-use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Params
-};
-use rand::Rng;
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Params};
+use rand::{rngs::OsRng, Rng};
 use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
@@ -86,9 +83,9 @@ impl CASArgon {
         let params = Params::new(memory_cost_kib, iterations, parallelism, None)
             .map_err(|_| CasError::InvalidParameters)?;
         let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
-        let salt = SaltString::generate(&mut OsRng);
+        // Draws a 16-byte salt from the OS RNG; an RNG failure is an error, not a panic.
         let hash = argon2
-            .hash_password(password_to_hash.as_bytes(), &salt)
+            .hash_password(password_to_hash.as_bytes())
             .map_err(|_| CasError::PasswordHashingFailed)?;
         Ok(hash.to_string())
     }
@@ -163,10 +160,11 @@ impl CASArgon {
     /// Hashes a password using Argon2.
     /// Returns the hashed password as a string.
     pub fn hash_password(password_to_hash: String) -> CasResult<String> {
-        let salt = SaltString::generate(&mut OsRng);
+        // Argon2id v0x13, m = 19456 KiB, t = 2, p = 1, 32-byte output, 16-byte salt from
+        // the OS RNG (an RNG failure is an error, not a panic).
         let argon2 = Argon2::default();
         let hashed_password = argon2
-            .hash_password(password_to_hash.as_bytes(), &salt)
+            .hash_password(password_to_hash.as_bytes())
             .map_err(|_| CasError::PasswordHashingFailed)?
             .to_string();
         Ok(hashed_password)

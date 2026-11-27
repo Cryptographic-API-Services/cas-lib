@@ -128,6 +128,62 @@ mod compression {
         );
     }
 
+    /// The payload behind [`FRAME_FROM_ZSTD_0_13`].
+    fn zstd_0_13_fixture_payload() -> Vec<u8> {
+        let mut payload = Vec::new();
+        for i in 0..64u32 {
+            payload.extend_from_slice(
+                format!("cas-lib zstd fixture line {i:02}: compressed by the zstd 0.13 stack\n")
+                    .as_bytes(),
+            );
+        }
+        payload.extend(0u8..=255);
+        payload
+    }
+
+    /// `compress(zstd_0_13_fixture_payload(), 3)` as produced by cas-lib 0.7.1, which
+    /// used zstd 0.13.6 / zstd-safe 7.4.2 / zstd-sys 2.2.0+zstd.1.6.0. Data compressed
+    /// by earlier releases must keep decompressing after a zstd upgrade (#170).
+    const FRAME_FROM_ZSTD_0_13: &str = concat!(
+        "28b52ffd0058e50d00f4176361732d6c6962207a7374642066697874757265206c696e652030303a20",
+        "636f6d7072657373656420627920746865302e313320737461636b0a3132333435363738393130313233",
+        "3435363738393230313233343536373839333031323334353637383934303132333435363738393530",
+        "313233343536373839363031323300",
+        "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+        "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+        "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+        "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+        "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+        "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "41a811905f9ffd0df0350e127010f8ff06c13308f60f49d0483231491e492699a423c924993c929924",
+        "c94792492679493249c68d1b52ae7e4d6515",
+    );
+
+    fn from_hex(hex: &str) -> Vec<u8> {
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    pub fn frames_compressed_by_the_zstd_0_13_stack_still_decompress() {
+        let frame = from_hex(FRAME_FROM_ZSTD_0_13);
+        assert_eq!(frame.len(), 453);
+        let payload = zstd_0_13_fixture_payload();
+        assert_eq!(payload.len(), 4352);
+
+        assert_eq!(decompress(frame.clone()).unwrap(), payload);
+        // The limit still applies to old frames.
+        assert_eq!(decompress_with_limit(frame.clone(), payload.len()).unwrap(), payload);
+        assert_eq!(
+            decompress_with_limit(frame, payload.len() - 1),
+            Err(CasError::DecompressionLimitExceeded)
+        );
+    }
+
     #[test]
     pub fn invalid_input_is_compression_failed() {
         assert_eq!(

@@ -107,10 +107,10 @@ mod password_hashers {
     #[test]
     pub fn argon2_verify_still_accepts_hashes_below_the_hashing_minimums() {
         // Older hashes may use less memory than MIN_MEMORY_COST_MIB; they must verify.
-        use ::argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString}, Algorithm, Argon2, Params, Version};
+        use ::argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
         let password = random_password();
         let weak = Argon2::new(Algorithm::Argon2id, Version::V0x13, Params::new(8 * 1024, 1, 1, None).unwrap())
-            .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
+            .hash_password(password.as_bytes())
             .unwrap()
             .to_string();
         assert!(CASArgon::verify_password(weak.clone(), password).unwrap());
@@ -208,6 +208,50 @@ mod password_hashers {
         let hash = CASArgon::hash_password(password.clone()).unwrap();
         let verification = CASArgon::verify_password(hash, password).unwrap();
         assert_eq!(true, verification);
+    }
+
+    /// PHC strings made by cas-lib 0.7.1 (`argon2` 0.5.3 / `scrypt` 0.11.0, `password-hash`
+    /// 0.5) from the password below. Hashes stored by earlier releases must keep verifying
+    /// after the move to `password-hash` 0.6.
+    const COMPAT_PASSWORD: &str = "correct horse battery staple";
+    const ARGON2_HASH_FROM_0_7: &str = "$argon2id$v=19$m=19456,t=2,p=1$E2dTu7riGIydQy598q/Dgg$vASV7ismJs/pOUy9jYDv0QcHyIsa2dpjl2WW8V65V5M";
+    const ARGON2_PARAMETERS_HASH_FROM_0_7: &str = "$argon2id$v=19$m=19456,t=2,p=1$aIBUf5HTZQj3JRv6WHVptA$kxRUG9xATda+N8mOv2hLbQH2OibfcgP3Q6TyN5UZx1w";
+    const SCRYPT_HASH_FROM_0_7: &str = "$scrypt$ln=17,r=8,p=1$mxOjLUfBVXvNm795PPCdtg$bJVsGbuFqHEMrtpHJLjDhFrxZrXoQtgO4ExWnXjin10";
+    const SCRYPT_CUSTOMIZED_HASH_FROM_0_7: &str = "$scrypt$ln=10,r=8,p=1$KZzIPdmajsf/5EMVUs3SuA$BlrXt7ri5m9zJ4Zy7lj7pUCEvQc7Tg1AfgoBb7/+77k";
+
+    #[test]
+    pub fn argon2_verifies_hashes_from_earlier_releases() {
+        for hash in [ARGON2_HASH_FROM_0_7, ARGON2_PARAMETERS_HASH_FROM_0_7] {
+            assert!(CASArgon::verify_password(hash.to_string(), COMPAT_PASSWORD.to_string()).unwrap(), "{hash}");
+            assert!(!CASArgon::verify_password(hash.to_string(), "correct horse battery stapler".to_string()).unwrap(), "{hash}");
+        }
+    }
+
+    #[test]
+    pub fn scrypt_verifies_hashes_from_earlier_releases() {
+        for hash in [SCRYPT_HASH_FROM_0_7, SCRYPT_CUSTOMIZED_HASH_FROM_0_7] {
+            assert!(CASScrypt::verify_password(hash.to_string(), COMPAT_PASSWORD.to_string()).unwrap(), "{hash}");
+            assert!(!CASScrypt::verify_password(hash.to_string(), "correct horse battery stapler".to_string()).unwrap(), "{hash}");
+        }
+    }
+
+    /// The default cost parameters, output length (32 bytes = 43 "B64" chars) and salt
+    /// length (16 bytes = 22 chars) must not change with a dependency upgrade.
+    #[test]
+    pub fn default_parameters_are_unchanged() {
+        let fields = |hash: &str| hash.split('$').map(str::to_string).collect::<Vec<_>>();
+
+        let argon2 = fields(&CASArgon::hash_password(random_password()).unwrap());
+        assert_eq!(&argon2[1..4], ["argon2id", "v=19", "m=19456,t=2,p=1"]);
+        assert_eq!((argon2[4].len(), argon2[5].len()), (22, 43));
+
+        let scrypt = fields(&CASScrypt::hash_password(random_password()).unwrap());
+        assert_eq!(&scrypt[1..3], ["scrypt", "ln=17,r=8,p=1"]);
+        assert_eq!((scrypt[3].len(), scrypt[4].len()), (22, 43));
+
+        let customized = fields(&CASScrypt::hash_password_customized(random_password(), 10, 4, 2).unwrap());
+        assert_eq!(&customized[1..3], ["scrypt", "ln=10,r=4,p=2"]);
+        assert_eq!((customized[3].len(), customized[4].len()), (22, 43));
     }
 
     #[test]
@@ -525,5 +569,17 @@ mod password_hashers {
 
         let recomputed = pbkdf2::derivation_with_salt(password, rounds, result.salt.clone()).unwrap();
         assert_eq!(recomputed, result.password);
+    }
+
+    #[test]
+    pub fn pbkdf2_derivation_salt_shape_is_unchanged() {
+        // Callers store this salt: it is 16 random bytes as a 22-character unpadded
+        // "B64" (PHC salt) string, as returned by every earlier release.
+        let result = pbkdf2::derivation(random_password().into_bytes(), pbkdf2::MIN_ITERATIONS).unwrap();
+        assert_eq!(result.salt.len(), 22);
+        assert!(result
+            .salt
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'+' || *b == b'/'));
     }
 }
