@@ -1,5 +1,6 @@
+use std::mem::MaybeUninit;
+
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Params};
-use rand::{rngs::OsRng, Rng};
 use zeroize::Zeroizing;
 
 use crate::error::{CasError, CasResult};
@@ -95,8 +96,17 @@ impl CASArgon {
     ///
     /// The salt is not secret. Store it next to whatever the key protects, and pass
     /// it back with the same password to re-derive the same key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     pub fn generate_salt() -> Vec<u8> {
-        OsRng.gen::<[u8; KDF_SALT_LENGTH]>().to_vec()
+        // Filled straight from the OS RNG rather than via a zeroed buffer, which CodeQL
+        // reads as a hard-coded cryptographic value (`rust/hard-coded-cryptographic-value`).
+        let mut salt = [MaybeUninit::<u8>::uninit(); KDF_SALT_LENGTH];
+        getrandom::fill_uninit(&mut salt)
+            .expect("getrandom failure")
+            .to_vec()
     }
 
     /// Derives a 128-bit AES key from a password and salt with Argon2id.

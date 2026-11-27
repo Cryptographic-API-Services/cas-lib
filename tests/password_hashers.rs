@@ -157,6 +157,15 @@ mod password_hashers {
     }
 
     #[test]
+    pub fn argon2_generate_salt_is_random_and_kdf_salt_length() {
+        let first = CASArgon::generate_salt();
+        let second = CASArgon::generate_salt();
+        assert_eq!(first.len(), KDF_SALT_LENGTH);
+        assert_eq!(second.len(), KDF_SALT_LENGTH);
+        assert_ne!(first, second);
+    }
+
+    #[test]
     pub fn argon2_derive_with_salt_rejects_short_salt() {
         // A random salt one byte too short.
         let mut short = CASArgon::generate_salt();
