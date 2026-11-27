@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod message {
-    use cas_lib::message::{cas_hmac::CASHMAC, hmac::{HMAC, HMACSha512}};
+    use cas_lib::message::{cas_hmac::CASHMAC, hmac::{HMACSha256, HMACSha512}};
     use std::fs;
 
     #[test]
     pub fn hmac_sign() {
         let key = vec![1, 2, 3, 4, 5];
         let message = vec![6, 7, 8, 9, 10];
-        // Replace `ConcreteHmacType` with the actual struct that implements CASHMAC
-        let signature = HMAC::sign(key.clone(), message.clone()).unwrap();
+        let signature = HMACSha256::sign(key.clone(), message.clone()).unwrap();
         assert!(!signature.is_empty());
     }
 
@@ -16,8 +15,8 @@ mod message {
     pub fn hmac_verify() {
         let key = vec![1, 2, 3, 4, 5];
         let message = vec![6, 7, 8, 9, 10];
-        let signature = HMAC::sign(key.clone(), message.clone()).unwrap();
-        let is_valid = HMAC::verify(key, message, signature).unwrap();
+        let signature = HMACSha256::sign(key.clone(), message.clone()).unwrap();
+        let is_valid = HMACSha256::verify(key, message, signature).unwrap();
         assert!(is_valid);
     }
 
@@ -101,7 +100,7 @@ mod message {
         assert!(!cases.is_empty(), "no [L=32] vectors were parsed");
 
         for case in &cases {
-            let tag = HMAC::sign(case.key.clone(), case.msg.clone()).unwrap();
+            let tag = HMACSha256::sign(case.key.clone(), case.msg.clone()).unwrap();
             assert_eq!(tag.len(), 32, "SHA-256 HMAC must produce a 32-byte tag");
 
             // `Mac` is the full tag truncated to `Tlen` bytes.
@@ -110,7 +109,7 @@ mod message {
             // `verify` requires a full-length tag, so it only applies when the
             // vector is not truncated.
             if case.tlen == 32 {
-                assert!(HMAC::verify(case.key.clone(), case.msg.clone(), case.mac.clone()).unwrap());
+                assert!(HMACSha256::verify(case.key.clone(), case.msg.clone(), case.mac.clone()).unwrap());
             }
         }
     }
@@ -127,7 +126,7 @@ mod message {
         let mut tampered = case.mac.clone();
         tampered[0] ^= 0x01;
 
-        assert!(!HMAC::verify(case.key.clone(), case.msg.clone(), tampered).unwrap());
+        assert!(!HMACSha256::verify(case.key.clone(), case.msg.clone(), tampered).unwrap());
     }
 
     #[test]
@@ -182,6 +181,72 @@ mod message {
         tampered[0] ^= 0x01;
 
         assert!(!HMACSha512::verify(case.key.clone(), case.msg.clone(), tampered).unwrap());
+    }
+
+    /// Every variant returns a tag of its hash's output length, verifies its own
+    /// tag, and rejects a tampered tag, a truncated tag, and a different key.
+    fn check_round_trip<H: CASHMAC>(tag_len: usize) {
+        let key = vec![0x0b; 32];
+        let message = b"cas-lib hmac".to_vec();
+
+        let tag = H::sign(key.clone(), message.clone()).unwrap();
+        assert_eq!(tag.len(), tag_len);
+        assert!(H::verify(key.clone(), message.clone(), tag.clone()).unwrap());
+
+        let mut tampered = tag.clone();
+        tampered[0] ^= 0x01;
+        assert!(!H::verify(key.clone(), message.clone(), tampered).unwrap());
+        assert!(!H::verify(key.clone(), message.clone(), tag[..tag_len / 2].to_vec()).unwrap());
+        assert!(!H::verify(vec![0x0c; 32], message, tag).unwrap());
+    }
+
+    #[test]
+    fn hmac_round_trip_all_variants() {
+        use cas_lib::message::hmac::{HMACSha384, HMACSha3_256, HMACSha3_384, HMACSha3_512};
+
+        check_round_trip::<HMACSha256>(32);
+        check_round_trip::<HMACSha384>(48);
+        check_round_trip::<HMACSha512>(64);
+        check_round_trip::<HMACSha3_256>(32);
+        check_round_trip::<HMACSha3_384>(48);
+        check_round_trip::<HMACSha3_512>(64);
+    }
+
+    /// SHA-2 and SHA-3 at the same output size must not produce the same tag
+    /// (guards against a variant being wired to the wrong hash).
+    #[test]
+    fn hmac_variants_are_distinct() {
+        use cas_lib::message::hmac::{HMACSha384, HMACSha3_256, HMACSha3_384, HMACSha3_512};
+
+        let key = vec![0x0b; 32];
+        let message = b"cas-lib hmac".to_vec();
+        let tags = [
+            HMACSha256::sign(key.clone(), message.clone()).unwrap(),
+            HMACSha384::sign(key.clone(), message.clone()).unwrap(),
+            HMACSha512::sign(key.clone(), message.clone()).unwrap(),
+            HMACSha3_256::sign(key.clone(), message.clone()).unwrap(),
+            HMACSha3_384::sign(key.clone(), message.clone()).unwrap(),
+            HMACSha3_512::sign(key, message).unwrap(),
+        ];
+        for i in 0..tags.len() {
+            for j in i + 1..tags.len() {
+                assert_ne!(tags[i], tags[j], "variants {i} and {j} produced the same tag");
+            }
+        }
+    }
+
+    /// The deprecated `HMAC` name is still HMAC-SHA-256.
+    #[test]
+    #[allow(deprecated)]
+    fn hmac_deprecated_alias_is_sha256() {
+        use cas_lib::message::hmac::HMAC;
+
+        let key = vec![1, 2, 3, 4, 5];
+        let message = vec![6, 7, 8, 9, 10];
+        assert_eq!(
+            HMAC::sign(key.clone(), message.clone()).unwrap(),
+            HMACSha256::sign(key, message).unwrap()
+        );
     }
 }
 

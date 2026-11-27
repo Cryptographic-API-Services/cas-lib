@@ -52,7 +52,7 @@ All modules are declared and made public in [src/lib.rs](src/lib.rs). Note that 
 | `key_exchange` | X25519 |
 | `hybrid` | HPKE |
 | `sponges` | ASCON-AEAD |
-| `message` | HMAC, CMAC (AES-128, AES-256) |
+| `message` | HMAC (SHA-256/384/512, SHA3-256/384/512), CMAC (AES-128, AES-256) |
 | `kdf` | HKDF-SHA256, HKDF-SHA512 (extract, expand, derive) |
 | `pqc` | ML-KEM, SLH-DSA, ML-DSA |
 | `compression` | Zstandard |

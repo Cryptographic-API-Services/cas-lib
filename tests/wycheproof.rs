@@ -355,7 +355,9 @@ mod ascon_aead128 {
 mod hmac {
     use super::*;
     use cas_lib::message::cas_hmac::CASHMAC;
-    use cas_lib::message::hmac::{HMACSha512, HMAC};
+    use cas_lib::message::hmac::{
+        HMACSha256, HMACSha384, HMACSha3_256, HMACSha3_384, HMACSha3_512, HMACSha512,
+    };
 
     /// The library always produces and verifies the full-length tag. Groups
     /// with a truncated `tagSize` are checked against the leading bytes of the
@@ -400,12 +402,32 @@ mod hmac {
 
     #[test]
     fn hmac_sha256_vectors() {
-        run_hmac::<HMAC>("hmac_sha256_test.json", 256);
+        run_hmac::<HMACSha256>("hmac_sha256_test.json", 256);
+    }
+
+    #[test]
+    fn hmac_sha384_vectors() {
+        run_hmac::<HMACSha384>("hmac_sha384_test.json", 384);
     }
 
     #[test]
     fn hmac_sha512_vectors() {
         run_hmac::<HMACSha512>("hmac_sha512_test.json", 512);
+    }
+
+    #[test]
+    fn hmac_sha3_256_vectors() {
+        run_hmac::<HMACSha3_256>("hmac_sha3_256_test.json", 256);
+    }
+
+    #[test]
+    fn hmac_sha3_384_vectors() {
+        run_hmac::<HMACSha3_384>("hmac_sha3_384_test.json", 384);
+    }
+
+    #[test]
+    fn hmac_sha3_512_vectors() {
+        run_hmac::<HMACSha3_512>("hmac_sha3_512_test.json", 512);
     }
 }
 

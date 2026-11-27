@@ -36,7 +36,7 @@ Wycheproof is licensed under the Apache License 2.0; see
 | `aes_gcm_siv_test.json` | `aes_gcm_siv` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
 | `chacha20_poly1305_test.json` | `chacha20_poly1305` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
 | `ascon_sp800_232_aead128_test.json` | `ascon_aead128` in `tests/wycheproof.rs` (AAD and non-AAD APIs) |
-| `hmac_sha256_test.json`, `hmac_sha512_test.json` | `hmac` in `tests/wycheproof.rs` |
+| `hmac_sha{256,384,512}_test.json`, `hmac_sha3_{256,384,512}_test.json` | `hmac` in `tests/wycheproof.rs` |
 | `aes_cmac_test.json` | `cmac` in `tests/wycheproof.rs` (AES-192 cases skipped: no AES-192 CMAC; invalid key sizes must return `InvalidKey`) |
 | `hkdf_sha256_test.json`, `hkdf_sha512_test.json` | `hkdf` in `tests/wycheproof.rs` (`derive`, and `extract` + `expand`) |
 | `x25519_test.json` | `x25519` in `tests/wycheproof.rs` |
