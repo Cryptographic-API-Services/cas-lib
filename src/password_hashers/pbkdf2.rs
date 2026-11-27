@@ -1,5 +1,6 @@
 use argon2::password_hash::SaltString;
-use pbkdf2::pbkdf2_hmac_array;
+use hmac::SimpleHmac;
+use pbkdf2::pbkdf2;
 use rand::rngs::OsRng;
 use sha3::Sha3_256;
 
@@ -41,6 +42,11 @@ pub fn derivation_with_salt(password_vec: Vec<u8>, number_of_iterations: u32, sa
     if number_of_iterations < MIN_ITERATIONS || salt.len() < MIN_SALT_LENGTH {
         return Err(CasError::InvalidParameters);
     }
-    let key = pbkdf2_hmac_array::<Sha3_256, 32>(&password_vec, &salt, number_of_iterations).to_vec();
+    // sha3 0.12 no longer exposes a block-level core, so it cannot be used with
+    // `Hmac` (or `pbkdf2_hmac_array`, which is built on it). `SimpleHmac` computes
+    // the same HMAC over any `Digest`, so the derived key is unchanged.
+    let mut key = vec![0u8; 32];
+    pbkdf2::<SimpleHmac<Sha3_256>>(&password_vec, &salt, number_of_iterations, &mut key)
+        .map_err(|_| CasError::PasswordHashingFailed)?;
     Ok(key)
 }

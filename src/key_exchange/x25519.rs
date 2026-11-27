@@ -1,7 +1,7 @@
 
 
 use hkdf::Hkdf;
-use sha2_hkdf::Sha256;
+use sha2::Sha256;
 use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
