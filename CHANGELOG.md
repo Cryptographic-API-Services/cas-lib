@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.7.2...v0.7.3) - 2026-11-27
+
+### Added
+
+- add AES-CMAC and HMAC-SHA-384/SHA3 variants ([#190](https://github.com/Cryptographic-API-Services/cas-lib/pull/190))
+
 ## [0.7.2](https://github.com/Cryptographic-API-Services/cas-lib/compare/v0.7.1...v0.7.2) - 2026-11-27
 
 ### Documentation
