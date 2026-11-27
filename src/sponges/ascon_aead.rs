@@ -25,12 +25,20 @@ impl CASAsconAead for AsconAead {
         aead_helpers::decrypt_with_aad::<Ascon128>(&key, &nonce, &ciphertext, &[])
     }
 
-    /// Generates a 16-byte key for Ascon Aead
+    /// Generates a random 16-byte Ascon-AEAD128 key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8> {
         aead_helpers::random_bytes::<ASCON_KEY_LEN>()
     }
 
-    /// Generates a Ascon Aead nonce
+    /// Generates a random 16-byte Ascon-AEAD128 nonce. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8> {
         aead_helpers::random_bytes::<ASCON_NONCE_LEN>()
     }

@@ -201,7 +201,7 @@ fn main() {
 
 The symmetric module exposes AES-128-GCM, AES-256-GCM, AES-128/256-GCM-SIV,
 ChaCha20-Poly1305, and AES key wrapping. Keys come from `generate_key` (via
-`OsRng`). Each operation returns a `Result`, so handle the error (here with
+the operating system's random number generator, `getrandom`). Each operation returns a `Result`, so handle the error (here with
 `.unwrap()`).
 
 There are two ways to encrypt with an AEAD:
