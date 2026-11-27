@@ -17,13 +17,13 @@ crate-type = ["lib"]
 [dependencies]
 aes-gcm = "0.11.1"
 aes-gcm-siv = "0.12.1"
-argon2 = "0.5.2"
+argon2 = "0.6.0"
 bcrypt = "0.19.3"
 blake2 = "0.11.0"
 rand = "0.8.6"
 rsa = { version = "0.10", features = ["pkcs1v15"] }
-getrandom = { version = "0.4", features = ["sys_rng"] } # OS RNG: rand_core 0.10 SysRng for RSA keys, getrandom::fill for Ed25519 keys
-scrypt = "0.11.0"
+getrandom = { version = "0.4", features = ["sys_rng"] } # OS RNG: rand_core 0.10 SysRng for RSA keys, getrandom::fill for Ed25519 keys and PBKDF2 salts
+scrypt = { version = "0.12.0", default-features = false, features = ["phc", "getrandom"] } # 0.12 has no default features
 sha3 = "0.12.0"
 x25519-dalek = { version = "3.0.0", features = ["static_secrets", "getrandom"] }
 ascon-aead = "0.6.1"
