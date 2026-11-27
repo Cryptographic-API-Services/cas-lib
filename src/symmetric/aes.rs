@@ -29,7 +29,11 @@ impl CASAES256Encryption for CASAES256 {
         Ok(key_slice)
     }
 
-    /// Generates an AES 256 32-bit Key
+    /// Generates a random 32-byte AES-256 key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8> {
         aead_helpers::random_bytes::<AES256_KEY_LEN>()
     }
@@ -64,7 +68,11 @@ impl CASAES256Encryption for CASAES256 {
     }
 
 
-    /// Generates an AES nonce
+    /// Generates a random 12-byte AES-GCM nonce. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8> {
         aead_helpers::random_bytes::<AES_NONCE_LEN>()
     }
@@ -107,7 +115,11 @@ impl CASAES128Encryption for CASAES128 {
         Ok(key_slice)
     }
 
-    /// Generates an AES-128 16-byte key
+    /// Generates a random 16-byte AES-128 key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8> {
         aead_helpers::random_bytes::<AES128_KEY_LEN>()
     }
@@ -146,7 +158,11 @@ impl CASAES128Encryption for CASAES128 {
     }
 
 
-    /// Generates an AES nonce
+    /// Generates a random 12-byte AES-GCM nonce. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8> {
         aead_helpers::random_bytes::<AES_NONCE_LEN>()
     }

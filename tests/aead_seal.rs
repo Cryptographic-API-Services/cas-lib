@@ -31,10 +31,12 @@ struct Aead {
     seal: fn(Vec<u8>, Vec<u8>, Option<Vec<u8>>) -> cas_lib::error::CasResult<Vec<u8>>,
     open: fn(Vec<u8>, Vec<u8>, Option<Vec<u8>>) -> cas_lib::error::CasResult<Vec<u8>>,
     nonce_len: usize,
+    key_len: usize,
 }
 
 fn aead<T: CASAeadSeal>(
     name: &'static str,
+    key_len: usize,
     generate_key: fn() -> Vec<u8>,
     generate_nonce: fn() -> Vec<u8>,
     encrypt_with_aad: fn(Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) -> cas_lib::error::CasResult<Vec<u8>>,
@@ -49,6 +51,7 @@ fn aead<T: CASAeadSeal>(
         seal: T::seal,
         open: T::open,
         nonce_len: T::NONCE_LEN,
+        key_len,
     }
 }
 
@@ -56,6 +59,7 @@ fn all_aeads() -> Vec<Aead> {
     vec![
         aead::<CASAES128>(
             "AES-128-GCM",
+            16,
             <CASAES128 as CASAES128Encryption>::generate_key,
             <CASAES128 as CASAES128Encryption>::generate_nonce,
             <CASAES128 as CASAES128AadEncryption>::encrypt_plaintext_with_aad,
@@ -63,6 +67,7 @@ fn all_aeads() -> Vec<Aead> {
         ),
         aead::<CASAES256>(
             "AES-256-GCM",
+            32,
             <CASAES256 as CASAES256Encryption>::generate_key,
             <CASAES256 as CASAES256Encryption>::generate_nonce,
             <CASAES256 as CASAES256AadEncryption>::encrypt_plaintext_with_aad,
@@ -70,6 +75,7 @@ fn all_aeads() -> Vec<Aead> {
         ),
         aead::<CASAES128SIV>(
             "AES-128-GCM-SIV",
+            16,
             <CASAES128SIV as CASAES128SIVEncryption>::generate_key,
             <CASAES128SIV as CASAES128SIVEncryption>::generate_nonce,
             <CASAES128SIV as CASAES128SIVAadEncryption>::encrypt_plaintext_with_aad,
@@ -77,6 +83,7 @@ fn all_aeads() -> Vec<Aead> {
         ),
         aead::<CASAES256SIV>(
             "AES-256-GCM-SIV",
+            32,
             <CASAES256SIV as CASAES256SIVEncryption>::generate_key,
             <CASAES256SIV as CASAES256SIVEncryption>::generate_nonce,
             <CASAES256SIV as CASAES256SIVAadEncryption>::encrypt_plaintext_with_aad,
@@ -84,6 +91,7 @@ fn all_aeads() -> Vec<Aead> {
         ),
         aead::<CASChacha20Poly1305>(
             "ChaCha20-Poly1305",
+            32,
             <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_key,
             <CASChacha20Poly1305 as Chacha20Poly1305Encryption>::generate_nonce,
             <CASChacha20Poly1305 as Chacha20Poly1305AadEncryption>::encrypt_plaintext_with_aad,
@@ -91,6 +99,7 @@ fn all_aeads() -> Vec<Aead> {
         ),
         aead::<AsconAead>(
             "Ascon-AEAD128",
+            16,
             <AsconAead as CASAsconAead>::generate_key,
             <AsconAead as CASAsconAead>::generate_nonce,
             <AsconAead as CASAsconAeadAad>::encrypt_plaintext_with_aad,
@@ -107,6 +116,21 @@ fn plaintext() -> Vec<u8> {
 fn nonce_len_matches_generate_nonce() {
     for a in all_aeads() {
         assert_eq!((a.generate_nonce)().len(), a.nonce_len, "{}", a.name);
+    }
+}
+
+#[test]
+fn generate_key_and_nonce_have_right_length_and_differ() {
+    for a in all_aeads() {
+        let (key_1, key_2) = ((a.generate_key)(), (a.generate_key)());
+        assert_eq!(key_1.len(), a.key_len, "{}: key length", a.name);
+        assert_eq!(key_2.len(), a.key_len, "{}: key length", a.name);
+        assert_ne!(key_1, key_2, "{}: key repeated", a.name);
+
+        let (nonce_1, nonce_2) = ((a.generate_nonce)(), (a.generate_nonce)());
+        assert_eq!(nonce_1.len(), a.nonce_len, "{}: nonce length", a.name);
+        assert_eq!(nonce_2.len(), a.nonce_len, "{}: nonce length", a.name);
+        assert_ne!(nonce_1, nonce_2, "{}: nonce repeated", a.name);
     }
 }
 
