@@ -21,6 +21,7 @@ dependencies = [
  "cipher",
  "cpubits",
  "cpufeatures 0.3.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -183,6 +184,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 name = "cas-lib"
 version = "0.7.2"
 dependencies = [
+ "aes",
  "aes-gcm",
  "aes-gcm-siv",
  "aes-kw",
@@ -191,6 +193,7 @@ dependencies = [
  "bcrypt",
  "blake2",
  "chacha20poly1305",
+ "cmac",
  "curve25519-dalek",
  "ed25519-dalek",
  "getrandom 0.4.3",
@@ -263,6 +266,18 @@ dependencies = [
  "block-buffer 0.12.1",
  "crypto-common 0.2.2",
  "inout",
+ "zeroize",
+]
+
+[[package]]
+name = "cmac"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac78aa94ce13e432b332a4d1bf2eff167d3a2520188ee05b337180a42fd2e62e"
+dependencies = [
+ "cipher",
+ "dbl",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -396,6 +411,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "dbl"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0d7a944e61df464668c5f51f56cc667396a8821434273112948ea0b66e405d7"
+dependencies = [
+ "hybrid-array 0.4.15",
 ]
 
 [[package]]
