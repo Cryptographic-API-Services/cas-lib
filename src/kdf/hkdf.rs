@@ -1,5 +1,5 @@
 use ::hkdf::Hkdf;
-use sha2_hkdf::{Sha256, Sha512};
+use sha2::{Sha256, Sha512};
 use zeroize::{Zeroize, Zeroizing};
 
 use super::cas_hkdf::{CASHKDF, CASHkdfSha256, CASHkdfSha512};
