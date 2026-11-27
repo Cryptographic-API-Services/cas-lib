@@ -4,10 +4,10 @@
 
 use cas_lib::error::CasError;
 use cas_lib::kdf::cas_hkdf::{CASHkdfSha256, CASHkdfSha512, CASHKDF};
-use rand::{rngs::OsRng, Rng};
-
 fn random(len: usize) -> Vec<u8> {
-    (0..len).map(|_| OsRng.gen()).collect()
+    let mut bytes = vec![0u8; len];
+    getrandom::fill(&mut bytes).expect("getrandom failure");
+    bytes
 }
 
 /// One PRK, several `expand` calls with distinct `info`: the keys differ, and

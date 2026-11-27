@@ -32,7 +32,7 @@ fn cipher<A: KeyInit>(key: &[u8]) -> CasResult<A> {
 /// # Panics
 ///
 /// Panics if the operating system's random number generator fails, like
-/// `rand`'s `OsRng`, which this replaces (and `get_ed25519_key_pair`).
+/// `get_ed25519_key_pair`.
 pub(crate) fn random_bytes<const N: usize>() -> Vec<u8> {
     let mut buf = Zeroizing::new([MaybeUninit::<u8>::uninit(); N]);
     getrandom::fill_uninit(&mut *buf)
