@@ -31,6 +31,7 @@ cargo run
 - [Signatures (Ed25519)](#signatures-ed25519)
 - [Key Exchange (X25519)](#key-exchange-x25519)
 - [Message Authentication (HMAC)](#message-authentication-hmac)
+- [Message Authentication (CMAC)](#message-authentication-cmac)
 - [Key Derivation (HKDF)](#key-derivation-hkdf)
 - [Hybrid (HPKE)](#hybrid-hpke)
 - [Sponges (ASCON-AEAD)](#sponges-ascon-aead)
@@ -1023,34 +1024,89 @@ fn main() {
 
 ## Message Authentication (HMAC)
 
-The message module provides HMAC. `sign` produces a tag over a message using a
-shared key; `verify` recomputes the tag and confirms it matches. A correct
-key + message + signature triple verifies as `true`. `HMAC` uses SHA2-256
-(32-byte tag) and `HMACSha512` uses SHA2-512 (64-byte tag); both implement
-the same `CASHMAC` trait.
+The message module provides HMAC (RFC 2104) over SHA-2 and SHA-3. `sign`
+produces a tag over a message using a shared key; `verify` recomputes the tag
+and compares it in constant time, so a correct key + message + tag verifies as
+`true` and anything else (including a truncated tag) as `false`. Every variant
+implements the same `CASHMAC` trait:
+
+| Struct | Hash | Tag length |
+|---|---|---|
+| `HMACSha256` | SHA-256 | 32 bytes |
+| `HMACSha384` | SHA-384 | 48 bytes |
+| `HMACSha512` | SHA-512 | 64 bytes |
+| `HMACSha3_256` | SHA3-256 | 32 bytes |
+| `HMACSha3_384` | SHA3-384 | 48 bytes |
+| `HMACSha3_512` | SHA3-512 | 64 bytes |
+
+`HMAC` is a deprecated alias for `HMACSha256`.
 
 ```rust
-use cas_lib::message::{cas_hmac::CASHMAC, hmac::{HMAC, HMACSha512}};
+use cas_lib::message::{
+    cas_hmac::CASHMAC,
+    hmac::{HMACSha256, HMACSha3_256, HMACSha512},
+};
 
 fn main() {
     // Shared secret key and the message bytes (read a file here in practice).
-    let key: Vec<u8> = vec![1, 2, 3, 4, 5];
-    let message: Vec<u8> = std::fs::read("message.txt").unwrap();
+    let key: Vec<u8> = vec![0x0b; 32];
+    let message: Vec<u8> = b"message to authenticate".to_vec();
 
-    // Produce an authentication tag (HMAC-SHA256).
-    let signature = HMAC::sign(key.clone(), message.clone()).unwrap();
+    // Produce an authentication tag (HMAC-SHA-256).
+    let tag = HMACSha256::sign(key.clone(), message.clone()).unwrap();
 
     // Verify the tag with the same key and message -> true.
-    let is_valid = HMAC::verify(key.clone(), message.clone(), signature).unwrap();
+    let is_valid = HMACSha256::verify(key.clone(), message.clone(), tag).unwrap();
     println!("hmac-sha256 valid: {}", is_valid); // true
 
-    // Same API with HMAC-SHA512.
-    let signature = HMACSha512::sign(key.clone(), message.clone()).unwrap();
-    let is_valid = HMACSha512::verify(key, message, signature).unwrap();
+    // Same API with HMAC-SHA-512 ...
+    let tag = HMACSha512::sign(key.clone(), message.clone()).unwrap();
+    assert_eq!(tag.len(), 64);
+    let is_valid = HMACSha512::verify(key.clone(), message.clone(), tag).unwrap();
     println!("hmac-sha512 valid: {}", is_valid); // true
+
+    // ... and with HMAC-SHA3-256. A modified message does not verify.
+    let tag = HMACSha3_256::sign(key.clone(), message).unwrap();
+    let is_valid = HMACSha3_256::verify(key, b"tampered".to_vec(), tag).unwrap();
+    println!("hmac-sha3-256 valid: {}", is_valid); // false
 }
 ```
 
+
+## Message Authentication (CMAC)
+
+CMAC (NIST SP 800-38B; RFC 4493 for AES-128) is a MAC built on the AES block
+cipher instead of a hash. `CMACAES128` takes a 16-byte key and `CMACAES256` a
+32-byte key; both produce a 16-byte tag and implement the `CASCMAC` trait.
+`sign` returns `CasError::InvalidKey` for a key of the wrong length, and
+`verify` compares the full tag in constant time (a truncated or tampered tag
+verifies as `false`). Any uniformly random key of the right length works, for
+example one from the AES key generators.
+
+```rust
+use cas_lib::message::{cmac::CASCMAC, cas_cmac::{CMACAES128, CMACAES256}};
+use cas_lib::symmetric::aes::{CASAES128, CASAES256};
+use cas_lib::symmetric::cas_symmetric_encryption::{CASAES128Encryption, CASAES256Encryption};
+
+fn main() {
+    let message: Vec<u8> = b"message to authenticate".to_vec();
+
+    // AES-128-CMAC with a random 16-byte key.
+    let key = <CASAES128 as CASAES128Encryption>::generate_key();
+    let tag = CMACAES128::sign(key.clone(), message.clone()).unwrap();
+    assert_eq!(tag.len(), 16);
+    let is_valid = CMACAES128::verify(key, message.clone(), tag).unwrap();
+    println!("aes-128-cmac valid: {}", is_valid); // true
+
+    // AES-256-CMAC with a random 32-byte key.
+    let key = <CASAES256 as CASAES256Encryption>::generate_key();
+    let tag = CMACAES256::sign(key.clone(), message.clone()).unwrap();
+
+    // A modified message does not verify.
+    let is_valid = CMACAES256::verify(key, b"tampered".to_vec(), tag).unwrap();
+    println!("aes-256-cmac valid: {}", is_valid); // false
+}
+```
 
 ## Key Derivation (HKDF)
 

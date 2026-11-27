@@ -67,6 +67,8 @@ pub mod sponges {
 pub mod message {
     pub mod hmac;
     pub mod cas_hmac;
+    pub mod cmac;
+    pub mod cas_cmac;
 }
 
 pub mod signatures {
