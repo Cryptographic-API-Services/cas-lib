@@ -1,7 +1,6 @@
-use argon2::password_hash::SaltString;
+use argon2::password_hash::phc::Salt;
 use hmac::SimpleHmac;
 use pbkdf2::pbkdf2;
-use rand::rngs::OsRng;
 use sha3::Sha3_256;
 
 use super::cas_password_hasher::Pbkdf2Result;
@@ -23,9 +22,16 @@ pub const MIN_SALT_LENGTH: usize = 16;
 /// Returns `CasError::InvalidParameters` if `number_of_iterations` is below
 /// [`MIN_ITERATIONS`].
 pub fn derivation(password_vec: Vec<u8>, number_of_iterations: u32) -> CasResult<Pbkdf2Result> {
-    // Use Argon 2 salt and return the salt to the user so they can reuse it.
-    let salt = SaltString::generate(&mut OsRng);
-    let salt = salt.as_str().as_bytes().to_vec();
+    // 16 random bytes, returned as their 22-character unpadded "B64" (PHC salt string)
+    // encoding, so the caller can store the salt and reuse it. Callers already store
+    // salts in this shape, so it must not change.
+    let mut salt_bytes = [0u8; Salt::RECOMMENDED_LENGTH];
+    getrandom::fill(&mut salt_bytes).map_err(|_| CasError::PasswordHashingFailed)?;
+    let salt = Salt::new(&salt_bytes)
+        .map_err(|_| CasError::PasswordHashingFailed)?
+        .to_salt_string()
+        .as_bytes()
+        .to_vec();
     let key = derivation_with_salt(password_vec, number_of_iterations, salt.clone())?;
     Ok(Pbkdf2Result {
         password: key,
