@@ -22,7 +22,7 @@ bcrypt = "0.19.3"
 blake2 = "0.11.0"
 rand = "0.8.6"
 rsa = { version = "0.10", features = ["pkcs1v15"] }
-getrandom = { version = "0.4", features = ["sys_rng"] } # rand_core 0.10 OS RNG for RSA key generation
+getrandom = { version = "0.4", features = ["sys_rng"] } # OS RNG: rand_core 0.10 SysRng for RSA keys, getrandom::fill for Ed25519 keys and PBKDF2 salts
 scrypt = { version = "0.12.0", default-features = false, features = ["phc", "getrandom"] } # 0.12 has no default features
 sha3 = "0.12.0"
 x25519-dalek = { version = "3.0.0", features = ["static_secrets", "getrandom"] }
@@ -38,7 +38,7 @@ zstd = { version = "0.13.6", default-features = false } # no `legacy`: pre-v0.8 
 hpke = { version = "0.15.1", default-features = false, features = ["alloc", "x25519", "aes", "getrandom"] }
 uuid = { version = "1.10.0", features = ["v4"] }
 pbkdf2 = "0.13.0"
-ed25519-dalek = { version = "2", features = ["rand_core"] }
+ed25519-dalek = "3.0.0"
 hkdf = "0.13.0"
 chacha20poly1305 = "0.11.0"
 slh-dsa = "0.0.3"  
@@ -49,7 +49,7 @@ zeroize = "1.8"
 
 [dev-dependencies]
 serde_json = "1"
-curve25519-dalek = "4"
+curve25519-dalek = "5.0.0"
 
 # RSA key generation (crypto-bigint / crypto-primes, used by `rsa`) is very
 # slow unoptimized; keep it fast in dev and test builds.
