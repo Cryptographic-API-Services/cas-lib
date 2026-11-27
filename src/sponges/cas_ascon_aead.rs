@@ -1,8 +1,20 @@
 use crate::error::CasResult;
 
 pub trait CASAsconAead {
+    /// Generates a random 16-byte key from the operating system's random number
+    /// generator. The key is secret and owned by the caller, who must zeroize
+    /// it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8>;
-    /// Generates a random 16-byte nonce from `OsRng`. Use each nonce for one message only.
+    /// Generates a random 16-byte nonce from the operating system's random
+    /// number generator. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8>;
     /// Encrypts `plaintext` under `nonce`, returning `ciphertext || tag`.
     ///

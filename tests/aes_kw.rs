@@ -200,6 +200,23 @@ mod aes_kw {
     }
 
     #[test]
+    fn generate_kek_has_right_length_and_differs() {
+        let (a, b) = (
+            <CASAES256KW as CASAES256KeyWrap>::generate_kek(),
+            <CASAES256KW as CASAES256KeyWrap>::generate_kek(),
+        );
+        assert_eq!((a.len(), b.len()), (32, 32));
+        assert_ne!(a, b);
+
+        let (a, b) = (
+            <CASAES128KW as CASAES128KeyWrap>::generate_kek(),
+            <CASAES128KW as CASAES128KeyWrap>::generate_kek(),
+        );
+        assert_eq!((a.len(), b.len()), (16, 16));
+        assert_ne!(a, b);
+    }
+
+    #[test]
     fn aes_256_kw_round_trip() {
         let kek = <CASAES256KW as CASAES256KeyWrap>::generate_kek();
         let data_key = <CASAES256KW as CASAES256KeyWrap>::generate_kek();

@@ -1,6 +1,13 @@
 use crate::error::CasResult;
 
 pub trait CASAES256Encryption {
+    /// Generates a random key from the operating system's random number
+    /// generator. The key is secret and owned by the caller, who must zeroize
+    /// it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8>;
     /// Encrypts `plaintext` under `nonce`, returning `ciphertext || tag`.
     ///
@@ -16,12 +23,24 @@ pub trait CASAES256Encryption {
     /// Derives a key for this cipher from an X25519 shared secret and both parties'
     /// public keys (in either order). See the implementation for details.
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
-    /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
+    /// Generates a random nonce from the operating system's random number
+    /// generator. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
 }
 
 pub trait CASAES128Encryption {
+    /// Generates a random key from the operating system's random number
+    /// generator. The key is secret and owned by the caller, who must zeroize
+    /// it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8>;
     /// Encrypts `plaintext` under `nonce`, returning `ciphertext || tag`.
     ///
@@ -37,7 +56,12 @@ pub trait CASAES128Encryption {
     /// Derives a key for this cipher from an X25519 shared secret and both parties'
     /// public keys (in either order). See the implementation for details.
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
-    /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
+    /// Generates a random nonce from the operating system's random number
+    /// generator. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
 }
@@ -71,6 +95,13 @@ pub trait CASAES128AadEncryption {
 }
 
 pub trait CASAES256SIVEncryption {
+    /// Generates a random key from the operating system's random number
+    /// generator. The key is secret and owned by the caller, who must zeroize
+    /// it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8>;
     /// Encrypts `plaintext` under `nonce`, returning `ciphertext || tag`.
     ///
@@ -86,12 +117,24 @@ pub trait CASAES256SIVEncryption {
     /// Derives a key for this cipher from an X25519 shared secret and both parties'
     /// public keys (in either order). See the implementation for details.
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
-    /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
+    /// Generates a random nonce from the operating system's random number
+    /// generator. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
 }
 
 pub trait CASAES128SIVEncryption {
+    /// Generates a random key from the operating system's random number
+    /// generator. The key is secret and owned by the caller, who must zeroize
+    /// it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8>;
     /// Encrypts `plaintext` under `nonce`, returning `ciphertext || tag`.
     ///
@@ -107,12 +150,24 @@ pub trait CASAES128SIVEncryption {
     /// Derives a key for this cipher from an X25519 shared secret and both parties'
     /// public keys (in either order). See the implementation for details.
     fn key_from_x25519_shared_secret(shared_secret: Vec<u8>, public_key_a: Vec<u8>, public_key_b: Vec<u8>) -> CasResult<Vec<u8>>;
-    /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
+    /// Generates a random nonce from the operating system's random number
+    /// generator. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8>;
     fn key_from_vec(key_slice: Vec<u8>) -> CasResult<Vec<u8>>;
 }
 
 pub trait CASAES256KeyWrap {
+    /// Generates a random key-encryption key (KEK) from the operating system's
+    /// random number generator. The KEK is secret and owned by the caller, who
+    /// must zeroize it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_kek() -> Vec<u8>;
     fn wrap_key(kek: Vec<u8>, key_to_wrap: Vec<u8>) -> CasResult<Vec<u8>>;
     fn unwrap_key(kek: Vec<u8>, wrapped_key: Vec<u8>) -> CasResult<Vec<u8>>;
@@ -121,6 +176,13 @@ pub trait CASAES256KeyWrap {
 }
 
 pub trait CASAES128KeyWrap {
+    /// Generates a random key-encryption key (KEK) from the operating system's
+    /// random number generator. The KEK is secret and owned by the caller, who
+    /// must zeroize it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_kek() -> Vec<u8>;
     fn wrap_key(kek: Vec<u8>, key_to_wrap: Vec<u8>) -> CasResult<Vec<u8>>;
     fn unwrap_key(kek: Vec<u8>, wrapped_key: Vec<u8>) -> CasResult<Vec<u8>>;
@@ -129,6 +191,13 @@ pub trait CASAES128KeyWrap {
 }
 
 pub trait Chacha20Poly1305Encryption {
+    /// Generates a random key from the operating system's random number
+    /// generator. The key is secret and owned by the caller, who must zeroize
+    /// it when done (FFI layers: before freeing it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8>;
     /// Encrypts `plaintext` under `nonce`, returning `ciphertext || tag`.
     ///
@@ -141,7 +210,12 @@ pub trait Chacha20Poly1305Encryption {
     fn encrypt_plaintext(aes_key: Vec<u8>, nonce: Vec<u8>, plaintext: Vec<u8>) -> CasResult<Vec<u8>>;
     /// Decrypts `ciphertext || tag` under `nonce`.
     fn decrypt_ciphertext(aes_key: Vec<u8>, nonce: Vec<u8>, ciphertext: Vec<u8>) -> CasResult<Vec<u8>>;
-    /// Generates a random nonce from `OsRng`. Use each nonce for one message only.
+    /// Generates a random nonce from the operating system's random number
+    /// generator. Use each nonce for one message only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8>;
 }
 
@@ -206,7 +280,8 @@ pub trait Chacha20Poly1305AadEncryption {
 /// [`CASChacha20Poly1305`](super::chacha20poly1305::CASChacha20Poly1305) and
 /// [`AsconAead`](crate::sponges::ascon_aead::AsconAead).
 ///
-/// `seal` draws a fresh nonce from `OsRng` for every call and returns
+/// `seal` draws a fresh nonce from the operating system's random number
+/// generator for every call and returns
 /// `nonce || ciphertext || tag`; `open` splits that blob apart again. The caller
 /// never handles a nonce, so it cannot reuse one by mistake. This is the
 /// recommended way to encrypt with this crate.
@@ -226,7 +301,9 @@ pub trait CASAeadSeal {
     /// `None` is the same as empty AAD.
     ///
     /// Returns [`CasError::InvalidKey`](crate::error::CasError::InvalidKey) if
-    /// the key has the wrong length.
+    /// the key has the wrong length, and
+    /// [`CasError::EncryptionFailed`](crate::error::CasError::EncryptionFailed)
+    /// if the operating system's random number generator fails (no panic).
     fn seal(key: Vec<u8>, plaintext: Vec<u8>, aad: Option<Vec<u8>>) -> CasResult<Vec<u8>>;
 
     /// Decrypts a `nonce || ciphertext || tag` blob produced by [`seal`](Self::seal).

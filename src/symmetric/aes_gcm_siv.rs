@@ -29,7 +29,11 @@ impl CASAES256SIVEncryption for CASAES256SIV {
         Ok(key_slice)
     }
 
-    /// Generates an AES-256-GCM-SIV 32-byte key
+    /// Generates a random 32-byte AES-256-GCM-SIV key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8> {
         aead_helpers::random_bytes::<AES256_KEY_LEN>()
     }
@@ -61,7 +65,11 @@ impl CASAES256SIVEncryption for CASAES256SIV {
         derive_key_from_x25519_shared_secret(shared_secret, public_key_a, public_key_b, KDF_LABEL_AES_256_GCM_SIV, 32)
     }
 
-    /// Generates an AES-GCM-SIV nonce
+    /// Generates a random 12-byte AES-GCM-SIV nonce. Use a fresh nonce per message.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8> {
         aead_helpers::random_bytes::<AES_SIV_NONCE_LEN>()
     }
@@ -78,7 +86,11 @@ impl CASAES128SIVEncryption for CASAES128SIV {
         Ok(key_slice)
     }
 
-    /// Generates an AES-128-GCM-SIV 16-byte key
+    /// Generates a random 16-byte AES-128-GCM-SIV key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_key() -> Vec<u8> {
         aead_helpers::random_bytes::<AES128_KEY_LEN>()
     }
@@ -110,7 +122,11 @@ impl CASAES128SIVEncryption for CASAES128SIV {
         derive_key_from_x25519_shared_secret(shared_secret, public_key_a, public_key_b, KDF_LABEL_AES_128_GCM_SIV, 16)
     }
 
-    /// Generates an AES-GCM-SIV nonce
+    /// Generates a random 12-byte AES-GCM-SIV nonce. Use a fresh nonce per message.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system's random number generator fails.
     fn generate_nonce() -> Vec<u8> {
         aead_helpers::random_bytes::<AES_SIV_NONCE_LEN>()
     }
