@@ -390,3 +390,115 @@ mod ml_dsa_api {
         }
     }
 }
+
+/// Known-answer tests for SLH-DSA-SHAKE-128f key generation (FIPS 205).
+///
+/// `cas_lib::pqc::slh_dsa::generate_signing_and_verification_key` draws
+/// `SK.seed`, `SK.prf` and `PK.seed` from the OS RNG and builds the key with
+/// slh-dsa's `SigningKey::slh_keygen_internal`. Wycheproof has no SLH-DSA
+/// vectors, so these are the SLH-DSA-SHAKE-128f cases (tgId 4, tcId 31-40) of
+/// NIST ACVP `SLH-DSA-keyGen-FIPS205/internalProjection.json`
+/// (usnistgov/ACVP-Server@975de31eb83d87039ec88934fdc47d8c312b892d).
+/// Each vector's `sk` is `skSeed || skPrf || pk`, so only `pk` is listed.
+#[cfg(test)]
+mod slh_dsa_kat {
+    use cas_lib::pqc::slh_dsa::{generate_signing_and_verification_key, sign_message, verify_signature};
+    use slh_dsa::{signature::Keypair, Shake128f, SigningKey};
+
+    /// `(skSeed, skPrf, pkSeed, pk)`.
+    const KEYGEN_VECTORS: &[(&str, &str, &str, &str)] = &[
+        // tcId 31
+        ("3956AB391B4D22FC907AF0740326D061", "AB0EB206436F2B86EBE086D77739B3E4", "56505C229F4E7FA6B201714C7DCC9DA3",
+         "56505C229F4E7FA6B201714C7DCC9DA366578F1F24C3FE371C97C14CE0E79CDC"),
+        // tcId 32
+        ("57250E2880AF25BC0D8DBA76A8FBB666", "A0533D329A87D276A802A70EB58376A2", "F8B2314A9ABB09E72509F14A742035BA",
+         "F8B2314A9ABB09E72509F14A742035BA6B5F4A0CC172672BBE8DF3F86CB58F51"),
+        // tcId 33
+        ("DE486E8EADC57C5FDD27AF77CE69BD11", "67FB5878F5493EE18F64ABC9AC9134FB", "54588FC5EF647313E2FA30779F88068F",
+         "54588FC5EF647313E2FA30779F88068FF18AFFE7A11A74013C03E6EDA99609FC"),
+        // tcId 34
+        ("445FEFCA9EEA1DB4738A1741F3A60EA2", "7D833D62BAF7EBE4CFF06863E8AC91E0", "AB2BC0210F0949A2B42AE80FDCDFA4E2",
+         "AB2BC0210F0949A2B42AE80FDCDFA4E2D7E6412266744B0C38AC60F602749E26"),
+        // tcId 35
+        ("6871F7E947A7AE4506DCCAF19ED7FFAD", "BA5A37EFCA990D23065E810D31C5D040", "35635806B764B62DCAAD53DFEB29F8E2",
+         "35635806B764B62DCAAD53DFEB29F8E2623B5BDF6D4CACAC5C5F46A16964EE99"),
+        // tcId 36
+        ("7C353DC3733996FF98CC5D044B12F488", "8A9CBC4EDC92CDE474841DC01D974731", "B5835B6395B50538ADD7A66DD12241B9",
+         "B5835B6395B50538ADD7A66DD12241B951161AED8A96C72045566981D10A8FD0"),
+        // tcId 37
+        ("1EE3A65D2B258DE10AE19ED4A97B0391", "17914367222B2363F213FE7C8585B801", "ACB64C35AFB630F9EBAAE6E98796D719",
+         "ACB64C35AFB630F9EBAAE6E98796D7192620E3EDBABA95E14454B8354DF79BA1"),
+        // tcId 38
+        ("E7641BEB6720E99F5D880D840AD1EA06", "1D272B7823EA04CFE16EAE8A799D537C", "66B7EBA18B1745D782E923FE145B4FD8",
+         "66B7EBA18B1745D782E923FE145B4FD80A7EC1BC4F60630625645689F2A499D0"),
+        // tcId 39
+        ("01248AE5215566E4A833C84AA1A1DE4F", "62A110EEB0C8470C28F97015B9597499", "164024F24E4EBA2E8DADDD396D9D7A26",
+         "164024F24E4EBA2E8DADDD396D9D7A26C120BAC8D69FF6AFBF01CCE329B845D9"),
+        // tcId 40
+        ("9EA3BF72B04589EF93272E33D1071C2C", "16BC64474B8B9A0D1A355C1085110EFC", "3A79FAA1609703AFEBE4C03B4AF57F6D",
+         "3A79FAA1609703AFEBE4C03B4AF57F6DACE0E6BFDBBF2804A1808505CAE60B6C"),
+    ];
+
+    /// SLH-DSA-SHAKE-128f: n = 16, so 64-byte signing keys, 32-byte
+    /// verification keys and 17088-byte signatures (FIPS 205 table 2).
+    const N: usize = 16;
+    const SIGNING_KEY_LEN: usize = 4 * N;
+    const VERIFICATION_KEY_LEN: usize = 2 * N;
+    const SIGNATURE_LEN: usize = 17088;
+
+    fn decode_hex(hex: &str) -> Vec<u8> {
+        assert_eq!(hex.len() % 2, 0, "hex input must have an even length");
+        hex.as_bytes()
+            .chunks(2)
+            .map(|chunk| u8::from_str_radix(std::str::from_utf8(chunk).unwrap(), 16).unwrap())
+            .collect()
+    }
+
+    /// `slh_keygen_internal`, which key generation calls with OS-random seeds,
+    /// reproduces the ACVP key pairs byte for byte.
+    #[test]
+    fn keygen_internal_matches_acvp_vectors() {
+        for (sk_seed, sk_prf, pk_seed, pk) in KEYGEN_VECTORS {
+            let (sk_seed, sk_prf, pk_seed, pk) =
+                (decode_hex(sk_seed), decode_hex(sk_prf), decode_hex(pk_seed), decode_hex(pk));
+            assert_eq!([sk_seed.len(), sk_prf.len(), pk_seed.len()], [N; 3]);
+            let sk = SigningKey::<Shake128f>::slh_keygen_internal(&sk_seed, &sk_prf, &pk_seed);
+            assert_eq!(sk.verifying_key().to_bytes().to_vec(), pk);
+            assert_eq!(sk.to_bytes().to_vec(), [sk_seed, sk_prf, pk].concat());
+        }
+    }
+
+    /// Keys in the FIPS 205 encoding (what 0.7.x returned) sign and verify
+    /// through the public API.
+    #[test]
+    fn acvp_keys_sign_and_verify() {
+        let message = b"SLH-DSA known-answer key".to_vec();
+        for (sk_seed, sk_prf, _, pk) in KEYGEN_VECTORS.iter().take(2) {
+            let pk = decode_hex(pk);
+            let signing_key = [decode_hex(sk_seed), decode_hex(sk_prf), pk.clone()].concat();
+            let signature = sign_message(message.clone(), signing_key).unwrap();
+            assert_eq!(signature.len(), SIGNATURE_LEN);
+            assert!(verify_signature(message.clone(), signature, pk).unwrap());
+        }
+    }
+
+    /// A freshly generated key pair has the FIPS 205 lengths, its verification
+    /// key is the public half of the signing key, and it signs and verifies.
+    #[test]
+    fn fresh_key_round_trip() {
+        let keys = generate_signing_and_verification_key();
+        assert_eq!(keys.signing_key.len(), SIGNING_KEY_LEN);
+        assert_eq!(keys.verification_key.len(), VERIFICATION_KEY_LEN);
+        assert_eq!(&keys.signing_key[2 * N..], &keys.verification_key[..]);
+
+        let message = b"fresh SLH-DSA key".to_vec();
+        let signature = sign_message(message.clone(), keys.signing_key.clone()).unwrap();
+        assert_eq!(signature.len(), SIGNATURE_LEN);
+        assert!(verify_signature(message, signature.clone(), keys.verification_key.clone()).unwrap());
+        assert!(!verify_signature(b"other message".to_vec(), signature, keys.verification_key).unwrap());
+
+        // Each call draws fresh seeds.
+        let other = generate_signing_and_verification_key();
+        assert_ne!(other.signing_key, keys.signing_key);
+    }
+}
