@@ -660,6 +660,179 @@ mod ed25519 {
 }
 
 // ---------------------------------------------------------------------------
+// ECDSA / ECDH (P-256, P-384, P-521, secp256k1)
+// ---------------------------------------------------------------------------
+
+mod ecdsa {
+    use super::*;
+    use cas_lib::ecc::cas_ecdsa::{CASEcdsa, CASEcdsaP256, CASEcdsaP384, CASEcdsaP521, CASEcdsaSecp256k1};
+
+    /// `(public key PEM, message, signature) -> verified`.
+    type VerifyFn = fn(String, Vec<u8>, Vec<u8>) -> CasResult<bool>;
+
+    /// Runs a Wycheproof ECDSA verification file against `verify`, using each
+    /// group's `publicKeyPem` (SPKI).
+    ///
+    /// - `valid` signatures must verify.
+    /// - `invalid` ones must not: `Ok(false)`, or an error for a public key the
+    ///   library refuses to parse.
+    /// - `acceptable` passes either way (none of the files used has any).
+    ///
+    /// Each file must use the hash the API hashes with (`hash`), which the test
+    /// checks against every group's `sha`.
+    fn run_ecdsa(file_name: &str, hash: &str, verify: VerifyFn) {
+        let file = load(file_name);
+        let mut tally = Tally::new(file_name, &file);
+
+        for group in groups(&file) {
+            assert_eq!(str_field(group, "sha"), hash, "{file_name}: unexpected hash");
+            let public_key = str_field(group, "publicKeyPem").to_string();
+            for test in tests(group) {
+                tally.run += 1;
+                let verified = verify(public_key.clone(), hex_field(test, "msg"), hex_field(test, "sig"));
+                match str_field(test, "result") {
+                    "valid" => tally.check(verified == Ok(true), test, &format!("valid signature rejected: {verified:?}")),
+                    "invalid" => tally.check(verified != Ok(true), test, "invalid signature accepted"),
+                    "acceptable" => {}
+                    other => panic!("unexpected result `{other}` for {}", label(test)),
+                }
+            }
+        }
+
+        tally.finish();
+    }
+
+    #[test]
+    fn p256_der_vectors() {
+        run_ecdsa("ecdsa_secp256r1_sha256_test.json", "SHA-256", CASEcdsaP256::verify_der);
+    }
+
+    #[test]
+    fn p256_p1363_vectors() {
+        run_ecdsa("ecdsa_secp256r1_sha256_p1363_test.json", "SHA-256", CASEcdsaP256::verify);
+    }
+
+    #[test]
+    fn p384_der_vectors() {
+        run_ecdsa("ecdsa_secp384r1_sha384_test.json", "SHA-384", CASEcdsaP384::verify_der);
+    }
+
+    #[test]
+    fn p384_p1363_vectors() {
+        run_ecdsa("ecdsa_secp384r1_sha384_p1363_test.json", "SHA-384", CASEcdsaP384::verify);
+    }
+
+    #[test]
+    fn p521_der_vectors() {
+        run_ecdsa("ecdsa_secp521r1_sha512_test.json", "SHA-512", CASEcdsaP521::verify_der);
+    }
+
+    #[test]
+    fn p521_p1363_vectors() {
+        run_ecdsa("ecdsa_secp521r1_sha512_p1363_test.json", "SHA-512", CASEcdsaP521::verify);
+    }
+
+    /// The plain file follows standard ECDSA, where high-S signatures are
+    /// valid: `verify_der` accepts them.
+    #[test]
+    fn secp256k1_der_vectors() {
+        run_ecdsa("ecdsa_secp256k1_sha256_test.json", "SHA-256", CASEcdsaSecp256k1::verify_der);
+    }
+
+    #[test]
+    fn secp256k1_p1363_vectors() {
+        run_ecdsa("ecdsa_secp256k1_sha256_p1363_test.json", "SHA-256", CASEcdsaSecp256k1::verify);
+    }
+
+    /// The bitcoin file marks high-S signatures invalid (BIP-62 / BIP-146):
+    /// exactly what `verify_der_low_s` enforces.
+    #[test]
+    fn secp256k1_bitcoin_low_s_vectors() {
+        run_ecdsa(
+            "ecdsa_secp256k1_sha256_bitcoin_test.json",
+            "SHA-256",
+            CASEcdsaSecp256k1::verify_der_low_s,
+        );
+    }
+}
+
+mod ecdh {
+    use super::*;
+    use cas_lib::ecc::cas_ecdh::{CASEcdh, CASEcdhP256, CASEcdhP384, CASEcdhP521, CASEcdhSecp256k1};
+    use crate::common::ec::{pem, Curve};
+
+    /// `(my private key PEM, peer public key PEM) -> shared secret`.
+    type DhFn = fn(String, String) -> CasResult<Vec<u8>>;
+
+    /// Runs a Wycheproof ECDH file. `keys` turns a test's `private` and
+    /// `public` fields into the PEM keys the API takes.
+    ///
+    /// - `valid`: the shared secret must equal `shared`.
+    /// - `invalid` (invalid or wrong-curve public keys, invalid-curve attacks):
+    ///   `diffie_hellman` must return an error.
+    /// - `acceptable` (compressed points, unusual but harmless encodings): may
+    ///   be rejected, but if accepted the shared secret must still be `shared`.
+    fn run_ecdh(file_name: &str, dh: DhFn, keys: impl Fn(&Value) -> (String, String)) {
+        let file = load(file_name);
+        let mut tally = Tally::new(file_name, &file);
+
+        for group in groups(&file) {
+            for test in tests(group) {
+                tally.run += 1;
+                let (private_key, public_key) = keys(test);
+                let shared = dh(private_key, public_key);
+                let expected = hex_field(test, "shared");
+                match str_field(test, "result") {
+                    "valid" => tally.check(shared == Ok(expected), test, &format!("shared secret mismatch: {shared:?}")),
+                    "invalid" => tally.check(shared.is_err(), test, "invalid public key accepted"),
+                    "acceptable" => tally.check(
+                        shared.as_ref().map_or(true, |s| *s == expected),
+                        test,
+                        "accepted, but with the wrong shared secret",
+                    ),
+                    other => panic!("unexpected result `{other}` for {}", label(test)),
+                }
+            }
+        }
+
+        tally.finish();
+    }
+
+    /// The `_pem` files give both keys as PEM, exactly what the API takes.
+    fn pem_keys(test: &Value) -> (String, String) {
+        (str_field(test, "private").to_string(), str_field(test, "public").to_string())
+    }
+
+    #[test]
+    fn p256_vectors() {
+        run_ecdh("ecdh_secp256r1_pem_test.json", CASEcdhP256::diffie_hellman, pem_keys);
+    }
+
+    #[test]
+    fn p384_vectors() {
+        run_ecdh("ecdh_secp384r1_pem_test.json", CASEcdhP384::diffie_hellman, pem_keys);
+    }
+
+    #[test]
+    fn p521_vectors() {
+        run_ecdh("ecdh_secp521r1_pem_test.json", CASEcdhP521::diffie_hellman, pem_keys);
+    }
+
+    /// There is no `_pem` file for secp256k1. This one gives the private key as
+    /// a raw scalar, which the test wraps in PKCS#8, and the public key as SPKI
+    /// DER, which it PEM-armors unchanged (malformed DER included).
+    #[test]
+    fn secp256k1_vectors() {
+        run_ecdh("ecdh_secp256k1_test.json", CASEcdhSecp256k1::diffie_hellman, |test| {
+            let private_key = Curve::Secp256k1
+                .private_key_pem(&hex_field(test, "private"))
+                .unwrap_or_else(|| panic!("{}: private key is not a valid scalar", label(test)));
+            (private_key, pem("PUBLIC KEY", &hex_field(test, "public")))
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
 // ML-KEM-1024
 // ---------------------------------------------------------------------------
 

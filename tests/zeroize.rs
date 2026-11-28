@@ -146,6 +146,41 @@ mod zeroize_tests {
         assert!(mldsa.signing_key.is_empty() && mldsa.verification_key.is_empty());
     }
 
+    /// `EcKeyPair` (ECDSA and ECDH) redacts the private key PEM in `Debug`,
+    /// still prints the public key, and zeroizes both fields.
+    #[test]
+    fn ec_key_pairs_redact_and_zeroize() {
+        use cas_lib::ecc::cas_ecdh::{CASEcdh, CASEcdhP521};
+        use cas_lib::ecc::cas_ecdsa::{CASEcdsa, CASEcdsaP256};
+        use cas_lib::ecc::types::EcKeyPair;
+
+        let known = EcKeyPair { private_key: "PRIVATE-PEM".to_string(), public_key: "PUBLIC-PEM".to_string() };
+        assert_eq!(
+            format!("{:?}", known),
+            "EcKeyPair { private_key: [REDACTED; 11 bytes], public_key: \"PUBLIC-PEM\" }"
+        );
+
+        for mut pair in [CASEcdsaP256::generate_key_pair().unwrap(), CASEcdhP521::generate_key_pair().unwrap()] {
+            // Exactly the redaction marker and the public key: nothing else of
+            // the private key can be in the output. (Its PKCS#8 body shares the
+            // algorithm identifier and the embedded public key with the SPKI
+            // public key, so a substring search of it would be meaningless.)
+            assert_eq!(
+                format!("{:?}", pair),
+                format!(
+                    "EcKeyPair {{ private_key: [REDACTED; {} bytes], public_key: {:?} }}",
+                    pair.private_key.len(),
+                    pair.public_key
+                )
+            );
+            let pretty = format!("{:#?}", pair);
+            assert!(pretty.contains("REDACTED") && !pretty.contains(pair.private_key.as_str()), "{pretty}");
+
+            pair.zeroize();
+            assert!(pair.private_key.is_empty() && pair.public_key.is_empty());
+        }
+    }
+
     #[test]
     fn hkdf_aes_keys_unchanged_by_zeroization() {
         let shared_secret = vec![7u8; 32];

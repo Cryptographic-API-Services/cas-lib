@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+pub mod ec;
 pub mod wycheproof;
 
 /// Returns a path inside the OS temp directory for a test output file.

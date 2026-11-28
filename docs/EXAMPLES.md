@@ -15,11 +15,10 @@ cargo add cas-lib
 cargo run
 ```
 
-> **Note on "Digital Signature" and "ecdsa".** These two items appeared on the
-> original checklist in issue #7 but the standalone Digital Signature
-> implementation was removed from the library (it did little beyond what the
-> hashers already provide), and a dedicated ECDSA module was never shipped.
-> Use [Ed25519 signatures](#signatures-ed25519) or
+> **Note on "Digital Signature".** This item appeared on the original
+> checklist in issue #7, but the standalone Digital Signature implementation
+> was removed from the library (it did little beyond what the hashers already
+> provide). Use [ECDSA](#signatures-ecdsa), [Ed25519](#signatures-ed25519) or
 > [RSA sign/verify](#asymmetric-rsa) instead.
 
 ## Table of Contents
@@ -29,7 +28,9 @@ cargo run
 - [Hashers](#hashers)
 - [Asymmetric (RSA)](#asymmetric-rsa)
 - [Signatures (Ed25519)](#signatures-ed25519)
+- [Signatures (ECDSA)](#signatures-ecdsa)
 - [Key Exchange (X25519)](#key-exchange-x25519)
+- [Key Exchange (ECDH)](#key-exchange-ecdh)
 - [Message Authentication (HMAC)](#message-authentication-hmac)
 - [Message Authentication (CMAC)](#message-authentication-cmac)
 - [Key Derivation (HKDF)](#key-derivation-hkdf)
@@ -975,6 +976,70 @@ fn main() {
 ```
 
 
+## Signatures (ECDSA)
+
+The ecc module implements ECDSA over four curves. Each struct implements the
+`CASEcdsa` trait and hashes the message itself with the curve's standard hash,
+so pass the message, not a digest:
+
+| Struct | Curve | Hash | JOSE `alg` | P1363 signature |
+|---|---|---|---|---|
+| `CASEcdsaP256` | NIST P-256 | SHA-256 | `ES256` | 64 bytes |
+| `CASEcdsaP384` | NIST P-384 | SHA-384 | `ES384` | 96 bytes |
+| `CASEcdsaP521` | NIST P-521 | SHA-512 | `ES512` | 132 bytes |
+| `CASEcdsaSecp256k1` | secp256k1 | SHA-256 | `ES256K` | 64 bytes |
+
+- **Keys** are PEM. `generate_key_pair` returns an `EcKeyPair` with a PKCS#8
+  private key (`-----BEGIN PRIVATE KEY-----`) and an SPKI public key
+  (`-----BEGIN PUBLIC KEY-----`). SEC1 `EC PRIVATE KEY` PEMs are accepted as
+  input too. A key for another curve, or one that cannot be parsed, is
+  rejected with `CasError::InvalidPemKey`.
+- **Signatures** come in two encodings. `sign` / `verify` use the fixed-size
+  IEEE P1363 `r || s`, which JOSE (JWS/JWT), COSE and WebCrypto use.
+  `sign_der` / `verify_der` use ASN.1 DER, which X.509, TLS and OpenSSL use.
+- **Signing is deterministic** (RFC 6979): the same key and message always give
+  the same signature.
+- **`verify` returns `Ok(false)`** for any signature that doesn't verify,
+  including one that is malformed or in the other encoding.
+- **secp256k1 high-S signatures.** `sign` always produces low-S signatures.
+  `verify` / `verify_der` follow standard ECDSA and accept high-S ones too.
+  `CASEcdsaSecp256k1::verify_low_s` / `verify_der_low_s` reject them, as
+  Bitcoin (BIP-62 / BIP-146) and Ethereum require.
+
+```rust
+use cas_lib::ecc::cas_ecdsa::{CASEcdsa, CASEcdsaP256, CASEcdsaSecp256k1};
+use cas_lib::error::CasError;
+
+fn main() {
+    let message = b"message to sign".to_vec();
+
+    // ES256: ECDSA over P-256 with SHA-256.
+    let key_pair = CASEcdsaP256::generate_key_pair().unwrap();
+    println!("{}", key_pair.public_key); // -----BEGIN PUBLIC KEY----- ...
+
+    // P1363 (r || s), as JWS / JWT and WebCrypto use.
+    let signature = CASEcdsaP256::sign(key_pair.private_key.clone(), message.clone()).unwrap();
+    assert_eq!(signature.len(), 64);
+    let is_valid = CASEcdsaP256::verify(key_pair.public_key.clone(), message.clone(), signature).unwrap();
+    println!("es256 valid: {}", is_valid); // true
+
+    // ASN.1 DER, as X.509, TLS and OpenSSL use.
+    let der = CASEcdsaP256::sign_der(key_pair.private_key.clone(), message.clone()).unwrap();
+    let is_valid = CASEcdsaP256::verify_der(key_pair.public_key.clone(), b"tampered".to_vec(), der).unwrap();
+    println!("tampered message valid: {}", is_valid); // false
+
+    // A key for another curve is an error, not a failed verification.
+    let k1_pair = CASEcdsaSecp256k1::generate_key_pair().unwrap();
+    let wrong_curve = CASEcdsaP256::sign(k1_pair.private_key.clone(), message.clone());
+    assert_eq!(wrong_curve, Err(CasError::InvalidPemKey));
+
+    // ES256K. Signatures from `sign` are low-S, so the strict check accepts them.
+    let signature = CASEcdsaSecp256k1::sign(k1_pair.private_key.clone(), message.clone()).unwrap();
+    let is_valid = CASEcdsaSecp256k1::verify_low_s(k1_pair.public_key, message, signature).unwrap();
+    println!("es256k low-s valid: {}", is_valid); // true
+}
+```
+
 ## Key Exchange (X25519)
 
 The key_exchange module implements X25519 Diffie-Hellman. Each party generates a
@@ -1021,6 +1086,55 @@ fn main() {
 }
 ```
 
+
+## Key Exchange (ECDH)
+
+The ecc module also implements elliptic-curve Diffie-Hellman on the same four
+curves: `CASEcdhP256`, `CASEcdhP384`, `CASEcdhP521` and `CASEcdhSecp256k1`, each
+implementing the `CASEcdh` trait.
+
+- **Keys** are PEM, exactly as for [ECDSA](#signatures-ecdsa).
+- **Peer key validation.** `diffie_hellman` checks the peer's public key
+  before using it. A key that cannot be parsed, is for another curve, or holds
+  a point that is not on the curve is rejected with `CasError::InvalidPemKey`.
+  That check is what stops invalid-curve attacks.
+- **The shared secret** is the raw x-coordinate of the shared point: 32 bytes
+  for P-256 and secp256k1, 48 for P-384, 66 for P-521. This is the same value
+  as WebCrypto `deriveBits` and OpenSSL `EVP_PKEY_derive`.
+
+Don't use the shared secret as a key directly. Derive one with
+[HKDF](#key-derivation-hkdf), using an `info` that names your protocol and both
+public keys. ECDH also doesn't authenticate either party: make sure the peer's
+public key really is theirs, for example by checking an ECDSA signature over it.
+
+```rust
+use cas_lib::ecc::cas_ecdh::{CASEcdh, CASEcdhP256};
+use cas_lib::kdf::cas_hkdf::{CASHkdfSha256, CASHKDF};
+use cas_lib::symmetric::{aes::CASAES256, cas_symmetric_encryption::CASAeadSeal};
+
+fn main() {
+    // Each party generates a key pair and sends the other its public key.
+    let alice = CASEcdhP256::generate_key_pair().unwrap();
+    let bob = CASEcdhP256::generate_key_pair().unwrap();
+
+    // Both sides compute the same 32-byte shared secret.
+    let alice_secret = CASEcdhP256::diffie_hellman(alice.private_key.clone(), bob.public_key.clone()).unwrap();
+    let bob_secret = CASEcdhP256::diffie_hellman(bob.private_key.clone(), alice.public_key.clone()).unwrap();
+    assert_eq!(alice_secret, bob_secret);
+
+    // Derive an AES-256 key from it, bound to the protocol and both public keys.
+    let mut info = b"my-app/v1/ecdh-p256/aes-256-gcm".to_vec();
+    info.extend_from_slice(alice.public_key.as_bytes());
+    info.extend_from_slice(bob.public_key.as_bytes());
+    let alice_key = CASHkdfSha256::derive(Vec::new(), alice_secret, info.clone(), 32).unwrap();
+    let bob_key = CASHkdfSha256::derive(Vec::new(), bob_secret, info, 32).unwrap();
+
+    // Alice encrypts and Bob decrypts.
+    let sealed = CASAES256::seal(alice_key, b"hello bob".to_vec(), None).unwrap();
+    let opened = CASAES256::open(bob_key, sealed, None).unwrap();
+    println!("{}", String::from_utf8(opened).unwrap()); // hello bob
+}
+```
 
 ## Message Authentication (HMAC)
 
@@ -1515,15 +1629,16 @@ fn main() {
 
 `cas-lib` zeroizes the intermediate secret buffers it allocates itself (for
 example the HKDF output and Argon2 derived keys and its copies of X25519 and Ed25519
-secret keys). Secrets it **returns** are plain `Vec<u8>` values that you own:
-generated and derived keys, private keys and shared secrets. Zeroize them once
-you no longer need them. FFI binding layers must zero these buffers before
-freeing them.
+secret keys). Secrets it **returns** are plain `Vec<u8>` (or, for PEM private
+keys, `String`) values that you own: generated and derived keys, private keys
+and shared secrets. Zeroize them once you no longer need them. FFI binding
+layers must zero these buffers before freeing them.
 
 The post-quantum result structs (`MlKemKeyPair`, `MlKemEncapResult`,
-`MlKemSharedSecret`, `SlhDsaKeyPair`, `MlDsaKeyPair`) implement
-`zeroize::Zeroize`, and their `Debug` output replaces each secret field with
-`[REDACTED; N bytes]`, so logging one with `{:?}` does not print the key. They
+`MlKemSharedSecret`, `SlhDsaKeyPair`, `MlDsaKeyPair`) and the ECDSA / ECDH
+`EcKeyPair` implement `zeroize::Zeroize`, and their `Debug` output replaces each
+secret field with `[REDACTED; N bytes]`, so logging one with `{:?}` does not
+print the key. They
 do not zeroize on drop, so that you can still move their fields out.
 
 This example uses the [`zeroize`](https://crates.io/crates/zeroize) crate

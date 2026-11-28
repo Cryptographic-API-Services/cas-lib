@@ -41,6 +41,11 @@ Wycheproof is licensed under the Apache License 2.0; see
 | `hkdf_sha256_test.json`, `hkdf_sha512_test.json` | `hkdf` in `tests/wycheproof.rs` (`derive`, and `extract` + `expand`) |
 | `x25519_test.json` | `x25519` in `tests/wycheproof.rs` |
 | `ed25519_test.json` | `ed25519` in `tests/wycheproof.rs` |
+| `ecdsa_secp{256r1_sha256,384r1_sha384,521r1_sha512,256k1_sha256}_test.json` | `ecdsa::*_der_vectors` in `tests/wycheproof.rs` (`verify_der`) |
+| `ecdsa_secp{256r1_sha256,384r1_sha384,521r1_sha512,256k1_sha256}_p1363_test.json` | `ecdsa::*_p1363_vectors` in `tests/wycheproof.rs` (`verify`) |
+| `ecdsa_secp256k1_sha256_bitcoin_test.json` | `ecdsa::secp256k1_bitcoin_low_s_vectors` in `tests/wycheproof.rs` (`verify_der_low_s`) |
+| `ecdh_secp{256r1,384r1,521r1}_pem_test.json` | `ecdh::p{256,384,521}_vectors` in `tests/wycheproof.rs` |
+| `ecdh_secp256k1_test.json` | `ecdh::secp256k1_vectors` in `tests/wycheproof.rs` (private scalar wrapped in PKCS#8, SPKI DER armored as PEM) |
 | `mlkem_1024_semi_expanded_decaps_test.json` | `ml_kem_1024` in `tests/wycheproof.rs` |
 | `mlkem_1024_encaps_test.json` | `ml_kem_1024` in `tests/wycheproof.rs` (invalid keys only) |
 | `rsa_signature_{2048,3072,4096,8192}_sha256_test.json` | `rsa_signatures::rs256_verify_vectors` in `tests/wycheproof.rs` |
@@ -65,6 +70,15 @@ correct output: X25519 `acceptable` cases must still produce the expected
 shared secret. The exception is a low-order public key, whose expected shared
 secret is all zeros (Wycheproof flag `ZeroSharedSecret`): `diffie_hellman`
 rejects those, and the test requires `CasError::InvalidKey` for them.
+
+ECDSA files have only `valid` and `invalid` cases. For ECDH, `acceptable`
+cases (compressed points, unusual but harmless encodings) may be rejected, but
+if `diffie_hellman` accepts one it must return the expected shared secret.
+
+secp256k1 high-S signatures are `valid` in the plain and `_p1363` files
+(standard ECDSA) and `invalid` in the `_bitcoin` file (BIP-62 / BIP-146). The
+plain files therefore run against `verify` / `verify_der`, which accept them,
+and the bitcoin file against `verify_der_low_s`, which rejects them.
 
 ## Skipped cases
 
@@ -118,6 +132,13 @@ to, so deterministic signing must reproduce the expected `sig` byte for byte.
   SHA-256 / MGF1-SHA-256 with a 32-byte salt, including the `_params` files)
   and **RSA-OAEP** — the library exposes only RS256 and PS256 signatures and
   no RSA encryption.
+- **ECDSA with other hashes** (`ecdsa_*_sha3_*`, `_shake*`, `_sha512` for
+  P-256 and secp256k1, `_sha256` / `_sha512` for P-384) — each curve signs
+  and verifies with one hash only: SHA-256 for P-256 and secp256k1, SHA-384
+  for P-384, SHA-512 for P-521.
+- **ECDH `_ecpoint` and `_webcrypto` files**, and the `asn` files for the
+  NIST curves — the API takes PEM, and the `_pem` files hold the same cases
+  in that form. secp256k1 has no `_pem` file, so its `asn` file is used.
 - **PBKDF2** — the library uses HMAC-SHA3-256; Wycheproof has PBKDF2 vectors
   for HMAC-SHA1/224/256/384/512 only.
 - **HKDF-SHA1 / SHA-384** — the `kdf` module exposes only HKDF-SHA256 and
